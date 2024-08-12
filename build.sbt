@@ -2,16 +2,49 @@ import com.typesafe.sbt.packager.Keys.{ bashScriptExtraDefines, scriptClasspath 
 import play.sbt.PlayCommands
 import play.sbt.PlayInternalKeys.playDependencyClasspath
 import play.sbt.routes.RoutesKeys
+import com.typesafe.sbt.packager.debian.DebianPlugin
+import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport._
+import sbt._
+import Keys._
+import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 
 import BuildSettings.*
 import Dependencies.*
 
-lazy val root = Project("lila", file("."))
-  .enablePlugins(JavaServerAppPackaging, RoutesCompiler)
+lazy val root = (project in file("."))
+  .enablePlugins(JavaAppPackaging, RoutesCompiler, DebianPlugin)
   .dependsOn(api)
   .aggregate(api)
-  .settings(buildSettings)
-  .settings(scalacOptions ++= Seq("-unchecked", "-deprecation"))
+  .settings(
+    name := "lila",
+    buildSettings,
+    scalacOptions ++= Seq("-unchecked", "-deprecation"),
+    Debian / packageName := "lila",
+    Debian / maintainer := "tarikhoshko@gmail.com",
+    Debian / version := "1.0.0",
+    Debian / packageSummary := "Lila chess server",
+    Debian / packageDescription := "Lila is a chess server providing various functionalities.",
+    mappings in Universal ++= {
+      val jar = (Compile / packageBin).value
+      val publicDir = baseDirectory.value / "public" 
+      val logsDir = baseDirectory.value / "logs"
+      Seq(
+        jar -> s"/usr/bin/${name.value}.jar"
+      ) ++
+      (publicDir ** "*").get.map { file =>
+        val path = file.relativeTo(publicDir).get.getPath
+        file -> s"/public/$path"
+      } ++
+      (logsDir ** "*").get.map { file =>
+        val path = file.relativeTo(logsDir).get.getPath
+        file -> s"/logs/$path"
+      } ++
+      Seq(
+        baseDirectory.value / "conf" / "logger.dev.xml" -> s"/conf/logger.dev.xml",
+        baseDirectory.value / "conf" / "application.conf" -> s"/conf/application.conf"
+      )
+    }
+  )
 
 organization         := "org.lichess"
 Compile / run / fork := true
@@ -35,12 +68,14 @@ Compile / RoutesKeys.routes / sources ++= {
   val dirs = (Compile / unmanagedResourceDirectories).value
   (dirs * "routes").get ++ (dirs * "*.routes").get
 }
+
 Compile / RoutesKeys.generateReverseRouter := false
 Compile / RoutesKeys.generateForwardRouter := true
 target                                     := baseDirectory.value / "target"
 Compile / sourceDirectory                  := baseDirectory.value / "app"
 Compile / scalaSource                      := baseDirectory.value / "app"
 Universal / sourceDirectory                := baseDirectory.value / "dist"
+
 
 // cats-parse v1.0.0 is the same as v0.3.1, so this is safe
 ThisBuild / libraryDependencySchemes ++= Seq(
