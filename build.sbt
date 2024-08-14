@@ -7,7 +7,6 @@ import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport._
 import sbt._
 import Keys._
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
-
 import BuildSettings.*
 import Dependencies.*
 
@@ -21,7 +20,7 @@ lazy val root = (project in file("."))
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
     Debian / packageName := "lila",
     Debian / maintainer := "tarikhoshko@gmail.com",
-    Debian / version := "1.0.0",
+    Debian / version := sys.props.getOrElse("VERSION", "1.0.0"),  
     Debian / packageSummary := "Lila chess server",
     Debian / packageDescription := "Lila is a chess server providing various functionalities.",
     mappings in Universal ++= {
