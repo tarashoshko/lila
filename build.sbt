@@ -10,7 +10,7 @@ import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import BuildSettings.*
 import Dependencies.*
 
-lazy val root = (project in file("."))
+lazy val root = Project("lila", file("."))
   .enablePlugins(JavaAppPackaging, RoutesCompiler, DebianPlugin)
   .dependsOn(api)
   .aggregate(api)
@@ -18,7 +18,7 @@ lazy val root = (project in file("."))
     name := "lila",
     buildSettings,
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
-    Debian / packageName := "lila",
+    Debian / name := "lila",
     Debian / maintainer := "tarikhoshko@gmail.com",
     Debian / version := sys.props.getOrElse("VERSION", "1.0.0"),  
     Debian / packageSummary := "Lila chess server",
