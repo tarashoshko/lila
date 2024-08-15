@@ -27,9 +27,6 @@ lazy val root = Project("lila", file("."))
       val jar = (Compile / packageBin).value
       val publicDir = baseDirectory.value / "public" 
       val logsDir = baseDirectory.value / "logs"
-      Seq(
-        jar -> s"/usr/bin/${name.value}.jar"
-      ) ++
       (publicDir ** "*").get.map { file =>
         val path = file.relativeTo(publicDir).get.getPath
         file -> s"/public/$path"
