@@ -71,7 +71,7 @@ pipeline {
                             echo "Current VERSION: ${env.VERSION}"
                             
                             def cleanTag = latestTag.replaceFirst(/^v/, '')
-                            echo "Current cleanTag: ${env.cleanTag}"
+                            echo "Current cleanTag: ${cleanTag}"
                             if (cleanTag != "no-tags") {
                                 def versionParts = cleanTag.tokenize('.')
                                 def major = versionParts[0].toInteger()
