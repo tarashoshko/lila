@@ -9,6 +9,31 @@ import Keys._
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import BuildSettings.*
 import Dependencies.*
+import com.typesafe.sbt.packager.archetypes.systemloader.SystemdPlugin
+
+val createSystemdService = Def.task {
+  val fileContent =
+    """|[Unit]
+       |Description=Lila Service
+       |After=network.target
+       |
+       |[Service]
+       |Type=simple
+       |User=vagrant
+       |Group=vagrant
+       |EnvironmentFile=/etc/environment
+       |ExecStart=/usr/share/lila/bin/lila
+       |Restart=on-failure
+       |RestartSec=10
+       |
+       |[Install]
+       |WantedBy=multi-user.target
+       |""".stripMargin
+
+  val serviceFile = baseDirectory.value / "lila.service"
+  IO.write(serviceFile, fileContent)
+  serviceFile
+}
 
 lazy val root = Project("lila", file("."))
   .enablePlugins(JavaAppPackaging, RoutesCompiler, DebianPlugin)
@@ -23,6 +48,9 @@ lazy val root = Project("lila", file("."))
     Debian / version := sys.props.getOrElse("VERSION", "1.0.0"),  
     Debian / packageSummary := "Lila chess server.",
     Debian / packageDescription := "Lila is a chess server providing different functionalities!!",
+    linuxPackageMappings += packageMapping(
+      createSystemdService.value -> "/etc/systemd/system/lila.service"
+    ).withPerms("0644"),
     mappings in Universal ++= {
       val jar = (Compile / packageBin).value
       val publicDir = baseDirectory.value / "public" 
