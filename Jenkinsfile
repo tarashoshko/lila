@@ -106,12 +106,11 @@ pipeline {
             agent { label 'agent1' }
             steps {
                 script {
-                    sh '''
-                    #!/bin/bash
+                    sh(script: '''
                     export PATH=$PATH:${SBIN_PATH}
                     cd /home/vagrant/lila
                     sbt -DVERSION=${env.VERSION} compile debian:packageBin
-                    '''
+                    ''', shell: '/bin/bash')
                 }
             }
         }
