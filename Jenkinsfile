@@ -1,6 +1,6 @@
 pipeline {
     agent any
-    
+
     environment {
         ARTIFACT_PATH = '/home/vagrant/lila/target'
         BUILD_SERVER = 'vagrant@192.168.0.2'
@@ -17,7 +17,7 @@ pipeline {
         SSH = credentials('SSH_PRIVATE_KEY')
         VAULT_PASS = credentials('token_password')
     }
-    
+
     stages {
         stage('Setup SSH Known Hosts') {
             steps {
@@ -30,7 +30,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Upload GitHub Token to Orchestrator') {
             steps {
                 script {
@@ -41,7 +41,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Configure Jenkins Agent via Orchestrator') {
             steps {
                 script {
@@ -58,7 +58,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Determine Version') {
             steps {
                 script {
@@ -69,13 +69,13 @@ pipeline {
                             def latestTag = sh(script: 'git describe --tags --abbrev=0 || echo "no-tags"', returnStdout: true).trim()
                             echo "Latest Tag: ${latestTag}"
                             echo "Current VERSION: ${env.VERSION}"
-        
+
                             if (latestTag != "no-tags") {
                                 def versionParts = latestTag.tokenize('.')
                                 def major = versionParts[0].toInteger()
                                 def minor = versionParts[1].toInteger()
                                 def patch = versionParts[2].toInteger()
-        
+
                                 env.VERSION = "${major}.${minor}.${patch}"
                                 env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
                             } else {
@@ -92,7 +92,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build UI') {
             agent { label 'agent1' }
             steps {
@@ -101,7 +101,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build App') {
             agent { label 'agent1' }
             steps {
@@ -114,7 +114,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Upload to GitHub Releases') {
             agent { label 'agent1' }
             steps {
@@ -128,7 +128,7 @@ pipeline {
                         }"""
                         
                         echo "Release data: ${releaseData}"
-        
+
                         def existingRelease = sh(script: """
                             curl -H "Authorization: token \$GITHUB_TOKEN" \
                                  -H "Accept: application/vnd.github.v3+json" \
@@ -145,21 +145,21 @@ pipeline {
                                      -d '${releaseData}' \
                                      ${releaseUrl}
                             """, returnStdout: true).trim()
-        
+
                             def releaseId = sh(script: """
                                 echo '${createReleaseResponse}' | jq -r '.id'
                             """, returnStdout: true).trim()
-        
+
                             if (!releaseId) {
                                 error "Failed to extract releaseId from response."
                             }
-        
+
                             echo "New Release ID: ${releaseId}"
-        
+
                             def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
-        
+
                             echo "Upload URL: ${uploadUrl}"
-        
+
                             sh """
                             curl -H "Authorization: token \$GITHUB_TOKEN" \
                                  -H "Content-Type: application/octet-stream" \
@@ -173,7 +173,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Download Artifact to Orchestrator') {
             agent { label 'agent1' }
             steps {
@@ -186,6 +186,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Deploy') {
             steps {
                 script {
@@ -198,10 +199,11 @@ pipeline {
                 }
             }
         }
+
         stage('Test') {
             steps {
                 script {
-                    echo "Running  test..."
+                    echo "Running test..."
                     
                     if (0 == 0) {
                         echo "Test passed."
@@ -209,11 +211,11 @@ pipeline {
                 }
             }
         }
-    
-        post {
-            always {
-                cleanWs()
-            }
+    }
+
+    post {
+        always {
+            cleanWs()
         }
     }
 }
