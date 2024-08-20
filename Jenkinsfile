@@ -72,17 +72,23 @@ pipeline {
                             
                             def cleanTag = latestTag.replaceFirst(/^v/, '')
                             echo "Current cleanTag: ${cleanTag}"
-                            if (cleanTag != "no-tags") {
-                                def versionParts = cleanTag.tokenize('.')
-                                def major = versionParts[0].toInteger()
-                                def minor = versionParts[1].toInteger()
-                                def patch = versionParts[2].toInteger()
-        
-                                env.VERSION = "${major}.${minor}.${patch}"
-                                env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
+                            if (versionParts.size() == 3) {
+                                try {
+                                    def major = versionParts[0].toInteger()
+                                    def minor = versionParts[1].toInteger()
+                                    def patch = versionParts[2].toInteger()
+                                    
+                                    env.VERSION = "${major}.${minor}.${patch}"
+                                    env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
+                                } catch (NumberFormatException e) {
+                                    error "Version format error: ${e.message}, using default version."
+                                    env.VERSION = DEFAULT_VERSION
+                                    env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
+                                }
                             } else {
-                                error 'No tags found, using default version.'
-                                return
+                                error "Unexpected version format, using default version."
+                                env.VERSION = DEFAULT_VERSION
+                                env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
                             }
                         }
                     } catch (Exception e) {
