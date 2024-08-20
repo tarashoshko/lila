@@ -69,9 +69,9 @@ pipeline {
                             def latestTag = sh(script: 'git describe --tags --abbrev=0 || echo "no-tags"', returnStdout: true).trim()
                             echo "Latest Tag: ${latestTag}"
                             echo "Current VERSION: ${env.VERSION}"
-        
+                            
                             def cleanTag = latestTag.replaceFirst(/^v/, '')
-        
+                            echo "Current cleanTag: ${env.cleanTag}"
                             if (cleanTag != "no-tags") {
                                 def versionParts = cleanTag.tokenize('.')
                                 def major = versionParts[0].toInteger()
