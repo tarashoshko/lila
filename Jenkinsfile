@@ -23,10 +23,10 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    export PATH=$PATH:${SBIN_PATH}
-                    cd /home/vagrant/lila
-                    sbt -DVERSION=${env.VERSION} compile debian:packageBin
-                    '''.stripIndent()
+                    mkdir -p ~/.ssh
+                    ssh-keyscan -t ecdsa github.com >> ~/.ssh/known_hosts
+                    chmod 644 ~/.ssh/known_hosts
+                    '''
                 }
             }
         }
