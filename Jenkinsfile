@@ -69,13 +69,15 @@ pipeline {
                             def latestTag = sh(script: 'git describe --tags --abbrev=0 || echo "no-tags"', returnStdout: true).trim()
                             echo "Latest Tag: ${latestTag}"
                             echo "Current VERSION: ${env.VERSION}"
-
-                            if (latestTag != "no-tags") {
-                                def versionParts = latestTag.tokenize('.')
+        
+                            def cleanTag = latestTag.replaceFirst(/^v/, '')
+        
+                            if (cleanTag != "no-tags") {
+                                def versionParts = cleanTag.tokenize('.')
                                 def major = versionParts[0].toInteger()
                                 def minor = versionParts[1].toInteger()
                                 def patch = versionParts[2].toInteger()
-
+        
                                 env.VERSION = "${major}.${minor}.${patch}"
                                 env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
                             } else {
