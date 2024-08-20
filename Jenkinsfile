@@ -1,12 +1,12 @@
-t {
-        ARTIFACT_PATH = '/home/vagrant/lila/tapipeline {
+pipeline {
     agent any
     
-    environmenrget'
+    environment {
+        ARTIFACT_PATH = '/home/vagrant/lila/target'
         BUILD_SERVER = 'vagrant@192.168.0.2'
         DEFAULT_VERSION = '1.0.0'
         VERSION = "${DEFAULT_VERSION}"
-        ARTIFACT_FILE = 'lila_${VERSION}_all.deb'
+        ARTIFACT_FILE = "lila_${VERSION}_all.deb"
         GITHUB_REPO = 'tarashoshko/lila'
         GIT_BRANCH = 'main'
         GITHUB_TOKEN = credentials('Github_token')
@@ -30,54 +30,91 @@ t {
                 }
             }
         }
-
-        stage('Determine Version') {
+        
+        stage('Upload GitHub Token to Orchestrator') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
-                        // Fetch the tags and checkout the latest tag
-                        sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
-                        def latestTag = sh(script: 'git describe --tags --abbrev=0 || echo "no-tags"', returnStdout: true).trim()
-                        
-                        echo "Latest Tag: ${latestTag}"
-
-                        if (latestTag != "no-tags") {
-                            env.VERSION = latestTag.replaceFirst('^v', '')  // Remove 'v' prefix if exists
-                            env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
-                        } else {
-                            error 'No tags found. Unable to determine version.'
-                        }
-
-                        echo "Determined Version: ${env.VERSION}"
-                    }
+                    sh '''
+                    echo ${GITHUB_TOKEN} > /tmp/github_token.txt
+                    scp -i ${SSH} -o StrictHostKeyChecking=no /tmp/github_token.txt ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST}:/vagrant/ansible/playbooks/roles/development/files/github_token.txt
+                    '''
                 }
             }
         }
-
+        
+        stage('Configure Jenkins Agent via Orchestrator') {
+            steps {
+                script {
+                    sh '''
+                    echo ${VAULT_PASS} > /tmp/vault_password.txt
+                    scp -i ${SSH} -o StrictHostKeyChecking=no /tmp/vault_password.txt ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST}:/tmp/vault_password.txt
+                    ssh -i ${SSH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST} "
+                        cd /${ORCHESTRATOR_USER}/ansible && ansible-playbook -i inventory.ini playbooks/development.yml --vault-password-file /tmp/vault_password.txt
+                    "
+                    ssh -i ${SSH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST} "
+                        rm /tmp/vault_password.txt
+                    "
+                    '''
+                }
+            }
+        }
+        
+        stage('Determine Version') {
+            steps {
+                script {
+                    try {
+                        withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
+                            sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
+                            
+                            def latestTag = sh(script: 'git describe --tags --abbrev=0 || echo "no-tags"', returnStdout: true).trim()
+                            echo "Latest Tag: ${latestTag}"
+                            echo "Current VERSION: ${env.VERSION}"
+        
+                            if (latestTag != "no-tags") {
+                                def versionParts = latestTag.tokenize('.')
+                                def major = versionParts[0].toInteger()
+                                def minor = versionParts[1].toInteger()
+                                def patch = versionParts[2].toInteger()
+        
+                                env.VERSION = "${major}.${minor}.${patch}"
+                                env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
+                            } else {
+                                error 'No tags found, using default version.'
+                                return
+                            }
+                        }
+                    } catch (Exception e) {
+                        echo "Error retrieving version: ${e.message}, setting default version."
+                        env.VERSION = DEFAULT_VERSION
+                        env.ARTIFACT_FILE = "lila_${env.VERSION}_all.deb"
+                    }
+                    echo "Version: ${env.VERSION}"
+                }
+            }
+        }
+        
         stage('Build UI') {
             agent { label 'agent1' }
             steps {
                 script {
-                    sh """
-                    /home/vagrant/lila/ui/build
-                    """
+                    sh '/home/vagrant/lila/ui/build'
                 }
             }
         }
-
+        
         stage('Build App') {
             agent { label 'agent1' }
             steps {
                 script {
-                    sh """
-                    export PATH=\$PATH:${SBIN_PATH} 
-                    cd /home/vagrant/lila 
+                    sh '''
+                    export PATH=$PATH:${SBIN_PATH}
+                    cd /home/vagrant/lila
                     sbt -DVERSION=${env.VERSION} compile debian:packageBin
-                    """
+                    '''
                 }
             }
         }
-
+        
         stage('Upload to GitHub Releases') {
             agent { label 'agent1' }
             steps {
@@ -91,11 +128,11 @@ t {
                         }"""
                         
                         echo "Release data: ${releaseData}"
-
+        
                         def existingRelease = sh(script: """
                             curl -H "Authorization: token \$GITHUB_TOKEN" \
                                  -H "Accept: application/vnd.github.v3+json" \
-                                 ${releaseUrl}?per_page=100 | grep -o '"tag_name": "'${env.VERSION}'"' || true
+                                 ${releaseUrl}?per_page=100 | grep -o '"tag_name": "'${VERSION}'"' || true
                         """, returnStdout: true).trim()
                         
                         echo "Existing release: ${existingRelease}"
@@ -108,21 +145,21 @@ t {
                                      -d '${releaseData}' \
                                      ${releaseUrl}
                             """, returnStdout: true).trim()
-
+        
                             def releaseId = sh(script: """
                                 echo '${createReleaseResponse}' | jq -r '.id'
                             """, returnStdout: true).trim()
-
+        
                             if (!releaseId) {
                                 error "Failed to extract releaseId from response."
                             }
-
+        
                             echo "New Release ID: ${releaseId}"
-
+        
                             def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
-
+        
                             echo "Upload URL: ${uploadUrl}"
-
+        
                             sh """
                             curl -H "Authorization: token \$GITHUB_TOKEN" \
                                  -H "Content-Type: application/octet-stream" \
@@ -130,50 +167,29 @@ t {
                                  "${uploadUrl}"
                             """
                         } else {
-                            echo "Release with tag '${env.VERSION}' already exists."
+                            echo "Release with tag '${VERSION}' already exists."
                         }
                     }
                 }
             }
         }
-
-        stage('Download Artifact to Orchestrator') {
-            agent { label 'agent1' }
+        
+        stage('Deploy to Production') {
+            agent { label 'agent2' }
             steps {
                 script {
-                    sshagent(credentials: ['SSH_PRIVATE_KEY']) {
-                        sh """
-                        scp -o StrictHostKeyChecking=no /home/vagrant/lila/target/${ARTIFACT_FILE} ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST}:/home/${ORCHESTRATOR_USER}/${ARTIFACT_FILE}
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                script {
-                    sh """
-                    ssh -i ${SSH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST} "
-                        cd /${ORCHESTRATOR_USER}/ansible &&
-                        ansible-playbook -i inventory.ini playbooks/application.yml -e 'version=${VERSION} artifact_file=${ARTIFACT_FILE}'
-                    "
-                    """
-                }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                script {
-                    echo "Running tests..."
-                    // Add actual test commands here
-                    if (0 == 0) {
-                        echo "Tests passed."
-                    }
+                    sh '''
+                    scp -i /home/vagrant/.ssh/id_rsa /home/vagrant/lila/target/${ARTIFACT_FILE} user@prod-server:/path/to/deploy
+                    ssh -i /home/vagrant/.ssh/id_rsa user@prod-server "sudo dpkg -i /path/to/deploy/${ARTIFACT_FILE} && sudo systemctl restart lila"
+                    '''
                 }
             }
         }
     }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
 }
-
