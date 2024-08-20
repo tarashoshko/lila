@@ -107,6 +107,7 @@ pipeline {
             steps {
                 script {
                     sh '''
+                    #!/bin/bash
                     export PATH=$PATH:${SBIN_PATH}
                     cd /home/vagrant/lila
                     sbt -DVERSION=${env.VERSION} compile debian:packageBin
