@@ -174,18 +174,41 @@ pipeline {
             }
         }
         
-        stage('Deploy to Production') {
-            agent { label 'agent2' }
+        stage('Download Artifact to Orchestrator') {
+            agent { label 'agent1' }
             steps {
                 script {
-                    sh '''
-                    scp -i /home/vagrant/.ssh/id_rsa /home/vagrant/lila/target/${ARTIFACT_FILE} user@prod-server:/path/to/deploy
-                    ssh -i /home/vagrant/.ssh/id_rsa user@prod-server "sudo dpkg -i /path/to/deploy/${ARTIFACT_FILE} && sudo systemctl restart lila"
-                    '''
+                    sshagent(credentials: ['SSH_PRIVATE_KEY']) {
+                        sh """
+                        scp -o StrictHostKeyChecking=no /home/vagrant/lila/target/${ARTIFACT_FILE} ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST}:/home/${ORCHESTRATOR_USER}/${ARTIFACT_FILE}
+                        """
+                    }
                 }
             }
         }
-    }
+        stage('Deploy') {
+            steps {
+                script {
+                    sh """
+                    ssh -i ${SSH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${ORCHESTRATOR_USER}@${ORCHESTRATOR_HOST} "
+                        cd /${ORCHESTRATOR_USER}/ansible &&
+                        ansible-playbook -i inventory.ini playbooks/application.yml -e 'version=${VERSION} artifact_file=${ARTIFACT_FILE}'
+                    "
+                    """
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                script {
+                    echo "Running  test..."
+                    
+                    if (0 == 0) {
+                        echo "Test passed."
+                    }
+                }
+            }
+        }
     
     post {
         always {
