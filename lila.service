@@ -1,0 +1,15 @@
+[Unit]
+Description=Lila Service
+After=network.target
+
+[Service]
+Type=simple
+User=vagrant
+Group=vagrant
+EnvironmentFile=/etc/environment
+ExecStart=/usr/share/lila/bin/lila
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
