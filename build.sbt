@@ -65,8 +65,7 @@ lazy val root = Project("lila", file("."))
       } ++
       Seq(
         baseDirectory.value / "conf" / "logger.dev.xml" -> s"/conf/logger.dev.xml",
-        baseDirectory.value / "conf" / "application.conf" -> s"/conf/application.conf",
-        jar -> s"/usr/bin/${name.value}.jar"
+        baseDirectory.value / "conf" / "application.conf" -> s"/conf/application.conf"
       )
     }
   )
