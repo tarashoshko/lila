@@ -13,7 +13,7 @@ pipeline {
         DEFAULT_VERSION = '1.0.0'
         VERSION = "${DEFAULT_VERSION}"
         ARTIFACT_FILE = "lila_${VERSION}_all.deb"
-        }
+    }
 
     stages {
         stage('Setup Environment') {
@@ -54,7 +54,7 @@ pipeline {
             steps {
                 script {
                     echo "Running test..."
-
+                    // Replace with actual test commands
                     if (0 == 0) {
                         echo "Test passed."
                     }
@@ -63,7 +63,9 @@ pipeline {
         }
 
         stage('Build UI') {
-            when { environment name: 'BUILD_UI', value: 'true' }
+            when {
+                environment name: 'BUILD_UI', value: 'true'
+            }
             steps {
                 script {
                     sh '/home/vagrant/lila/ui/build'
@@ -72,7 +74,9 @@ pipeline {
         }
 
         stage('Build Backend and Create Artifact') {
-            when { environment name: 'BUILD_BACKEND', value: 'true' }
+            when {
+                environment name: 'BUILD_BACKEND', value: 'true'
+            }
             steps {
                 script {
                     sh """
@@ -105,6 +109,7 @@ pipeline {
                 }
             }
         }
+    }
 
     post {
         always {
