@@ -91,6 +91,7 @@ pipeline {
             steps {
                 script {
                     sh """
+                    cd /vagrant/docker
                     docker build -t ${DOCKER_IMAGE_NAME}:latest -f Dockerfile.app .
                     docker push ${DOCKER_IMAGE_NAME}:latest
                     """
