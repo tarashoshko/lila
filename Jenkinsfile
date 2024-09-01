@@ -40,7 +40,6 @@ pipeline {
                         } else {
                             env.BUILD_UI = 'false'
                             env.BUILD_BACKEND = 'true'
-                            error "No relevant changes found."
                         }
                     }
                 }
