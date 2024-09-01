@@ -58,8 +58,8 @@ pipeline {
             }
         }
 
-        stage('Build UI')
-            agent { label 'agent1' }{
+        stage('Build UI') {
+            agent { label 'agent1' }
             when {
                 environment name: 'BUILD_UI', value: 'true'
             }
