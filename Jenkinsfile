@@ -37,12 +37,9 @@ pipeline {
                         if (changes.contains('ui/')) {
                             env.BUILD_UI = 'true'
                             env.BUILD_BACKEND = 'true'
-                        } else if (changes.contains('app/')) {
-                            env.BUILD_UI = 'false'
-                            env.BUILD_BACKEND = 'true'
                         } else {
                             env.BUILD_UI = 'false'
-                            env.BUILD_BACKEND = 'false'
+                            env.BUILD_BACKEND = 'true'
                             error "No relevant changes found."
                         }
                     }
