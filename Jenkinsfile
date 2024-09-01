@@ -59,10 +59,10 @@ pipeline {
         }
 
         stage('Build UI') {
-            agent { label 'agent1' }
             when {
                 environment name: 'BUILD_UI', value: 'true'
             }
+            agent { label 'agent1' }
             steps {
                 script {
                     sh '/home/vagrant/lila/ui/build'
@@ -71,10 +71,10 @@ pipeline {
         }
 
         stage('Build App') {
-            agent { label 'agent1' } {
             when {
                 environment name: 'BUILD_BACKEND', value: 'true'
             }
+            agent { label 'agent1' }
             steps {
                 script {
                     sh """
@@ -86,8 +86,8 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') 
-            agent { label 'agent1' } {
+        stage('Build Docker Images') {
+            agent { label 'agent1' }
             steps {
                 script {
                     sh """
