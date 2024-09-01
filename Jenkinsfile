@@ -106,16 +106,6 @@ pipeline {
             }
         }
 
-#        stage('Run Tests on Cluster') {
- #           steps {
-  #              script {
-  #                  // Наприклад, виклик e2e тестів
-  #                  sh 'kubectl run e2e-tests --image=your-e2e-image --kubeconfig ~/.kube/config'
-  #              }
-  #          }
-  #      }
-  #  }
-
     post {
         always {
             cleanWs()
