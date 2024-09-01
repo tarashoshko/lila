@@ -58,7 +58,8 @@ pipeline {
             }
         }
 
-        stage('Build UI') {
+        stage('Build UI')
+            agent { label 'agent1' }{
             when {
                 environment name: 'BUILD_UI', value: 'true'
             }
@@ -69,7 +70,8 @@ pipeline {
             }
         }
 
-        stage('Build Backend and Create Artifact') {
+        stage('Build App') {
+            agent { label 'agent1' } {
             when {
                 environment name: 'BUILD_BACKEND', value: 'true'
             }
@@ -84,7 +86,8 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build Docker Images') 
+            agent { label 'agent1' } {
             steps {
                 script {
                     sh """
