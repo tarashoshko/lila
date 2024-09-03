@@ -102,10 +102,13 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh """
-                    kubectl set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest --kubeconfig ~/.kube/config
-                    kubectl rollout status deployment/lila-service --kubeconfig ~/.kube/config
-                    """
+                    withCredentials([file(credentialsId: "${KUBECONFIG}", variable: 'KUBECONFIG_FILE')]) {
+                        sh """
+                        export KUBECONFIG=\$KUBECONFIG_FILE
+                        kubectl --kubeconfig=\$KUBECONFIG_FILE set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest
+                        kubectl --kubeconfig=\$KUBECONFIG_FILE rollout status deployment/lila-service
+                        """
+                    }
                 }
             }
         }
