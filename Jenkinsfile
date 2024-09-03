@@ -13,6 +13,7 @@ pipeline {
         DEFAULT_VERSION = '1.0.0'
         VERSION = "${DEFAULT_VERSION}"
         ARTIFACT_FILE = "lila_${VERSION}_all.deb"
+        KUBECONFIG = credentials('KUBECONFIG')
     }
 
     stages {
@@ -102,13 +103,14 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    withCredentials([file(credentialsId: "${KUBECONFIG}", variable: 'KUBECONFIG_FILE')]) {
-                        sh """
-                        export KUBECONFIG=\$KUBECONFIG_FILE
-                        kubectl --kubeconfig=\$KUBECONFIG_FILE set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest
-                        kubectl --kubeconfig=\$KUBECONFIG_FILE rollout status deployment/lila-service
-                        """
-                    }
+                    sh '''
+                    kubectl version --client
+                    kubectl config set-cluster my-cluster --server=http://192.168.59.101:6443 --kubeconfig=$KUBECONFIG
+                    kubectl config set-context my-context --cluster=my-cluster --user=my-user --kubeconfig=$KUBECONFIG
+                    kubectl config use-context my-context --kubeconfig=$KUBECONFIG
+                    kubectl set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest
+                    kubectl rollout status deployment/lila-service
+                    '''
                 }
             }
         }
