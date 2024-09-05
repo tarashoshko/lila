@@ -36,7 +36,7 @@ export const drawableSwiss = (data: GameData): boolean => !data.swiss || playedT
 
 export const resignable = (data: GameData): boolean => playable(data) && !abortable(data);
 
-// Can the current player go berserk?
+// Can the current player go berserk??
 export const berserkableBy = (data: GameData): boolean =>
   !!data.tournament && data.tournament.berserkable && isPlayerPlaying(data) && !bothPlayersHavePlayed(data);
 
