@@ -38,21 +38,34 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
         
-                        def tag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
+                        // Отримання тегів, які містять поточний коміт
+                        def tags = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
+                        echo "Tags for current commit: ${tags}"
         
-                        if (tag) {
-                            env.VERSION = tag.split('\n')[0]
+                        if (tags) {
+                            env.VERSION = tags.split('\n')[0].trim()
                             echo "Tag found for the current commit: ${env.VERSION}"
                             env.SKIP_UPLOAD = 'false'
                         } else {
                             echo "No tag found for the current commit. Fetching the latest release version from GitHub."
+                            
+                            // Отримання останнього релізу
                             def latestReleaseResponse = sh(script: 'curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${GITHUB_REPO}/releases/latest', returnStdout: true).trim()
                             echo "Latest release response: ${latestReleaseResponse}"
+        
+                            // Парсинг JSON
                             def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
-                            env.VERSION = latestReleaseTag
-                            echo "Using latest release version: ${env.VERSION}"
-                            env.SKIP_UPLOAD = 'true'
-                        }                        
+                            echo "Latest release tag: ${latestReleaseTag}"
+                            
+                            if (latestReleaseTag) {
+                                env.VERSION = latestReleaseTag
+                                echo "Using latest release version: ${env.VERSION}"
+                                env.SKIP_UPLOAD = 'true'
+                            } else {
+                                error "Failed to fetch the latest release tag from GitHub."
+                            }
+                        }
+                        
                         echo "Version to be used: ${env.VERSION}"
                     }
                 }
