@@ -3,14 +3,21 @@ pipeline {
 
     environment {
         ARTIFACT_PATH = '/home/vagrant/lila/target'
+	    DB_SETUP_FILE_PATH = '/home/vagrant/lila/bin/mongodb/indexes.js'
         GITHUB_REPO = 'tarashoshko/lila'
         GIT_BRANCH = 'main'
         GITHUB_TOKEN = credentials('Github_token')
         GITHUB_CREDENTIALS_ID = 'GIT_SSH'
         SBIN_PATH = '/home/vagrant/.local/share/coursier/bin'
-        DOCKER_IMAGE_NAME = 'tarashoshko/lila-app'
+        APP_IMAGE_NAME = 'tarashoshko/lila-app'
+        MONGO_IMAGE_NAME = "tarashoshko/custom-mongo"
+        DOCKERFILE_APP_PATH = "Dockerfile.app"
+        DOCKERFILE_MONGO_PATH = "Dockerfile.mongo"
         CLUSTER_IP = '192.168.59.101'
+        DEFAULT_VERSION = '1.0.0'
         VERSION = "${DEFAULT_VERSION}"
+        ARTIFACT_FILE = "lila_${VERSION}_all.deb"
+        KUBECONFIG = credentials('KUBECONFIG')
     }
 
     stages {
@@ -26,23 +33,59 @@ pipeline {
             }
         }
 
+        stage('Get Tag') {
+            steps {
+                 script {
+                    def gitTag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
+                    echo "Latest commit tags: ${gitTag}"
+
+                    if (gitTag) {
+                        def tagExists = sh(script: """
+                            curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+                            https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
+                            | grep -q 'not found'
+                        """, returnStatus: true) == 0
+
+                        if (!tagExists) {
+                            echo "Tag '${gitTag}' already exists in releases."
+                            VERSION = gitTag
+                            env.SKIP_UPLOAD = 'false'
+                        } else {
+                            echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
+                            VERSION = DEFAULT_VERSION
+                            env.SKIP_UPLOAD = 'true'
+                        }
+                    } else {
+                        echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
+                        VERSION = DEFAULT_VERSION
+                    }
+
+                    ARTIFACT_FILE = "lila_${VERSION}_all.deb"
+                    echo "Artifact file set to: ${ARTIFACT_FILE}"                    
+                }
+            }
+        }
+
         stage('Check for Changes') {
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
+			echo "Artifact file set to: ${ARTIFACT_FILE}"
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --all'
                         def changes = sh(script: 'git diff --name-only origin/${GIT_BRANCH}', returnStdout: true).trim()
                         if (changes.contains('ui/')) {
                             env.BUILD_UI = 'true'
                             env.BUILD_BACKEND = 'true'
-                        } else if (changes.contains('app/')) {
-                            env.BUILD_UI = 'false'
-                            env.BUILD_BACKEND = 'true'
                         } else {
                             env.BUILD_UI = 'false'
-                            env.BUILD_BACKEND = 'false'
-                            error "No relevant changes found."
+                            env.BUILD_BACKEND = 'true'
                         }
+
+			if (changes.contains('bin/mongodb/indexes.js')) {
+	                    env.BUILD_MONGO_INAGE = 'true'
+	                } else {
+	                    env.BUILD_MONGO_INAGE = 'false'
+	                }
                     }
                 }
             }
@@ -52,7 +95,6 @@ pipeline {
             steps {
                 script {
                     echo "Running test..."
-                    
                     if (0 == 0) {
                         echo "Test passed."
                     }
@@ -61,7 +103,13 @@ pipeline {
         }
 
         stage('Build UI') {
-            when { environment name: 'BUILD_UI', value: 'true' }
+            when {       
+                allOf {
+                    branch 'dev'
+                    expression { env.BUILD_UI == 'true' }
+                }
+            }
+            agent { label 'agent1' }
             steps {
                 script {
                     sh '/home/vagrant/lila/ui/build'
@@ -69,8 +117,14 @@ pipeline {
             }
         }
 
-        stage('Build Backend and Create Artifact') {
-            when { environment name: 'BUILD_BACKEND', value: 'true' }
+        stage('Build App') {
+            when {       
+                allOf {
+                    branch 'dev'
+                    expression { env.BUILD_BACKEND == 'true' }
+                }
+            }
+            agent { label 'agent1' }
             steps {
                 script {
                     sh """
@@ -81,38 +135,152 @@ pipeline {
                 }
             }
         }
-            
-        stage('Build Docker Images') {
+	    
+        stage('Upload Artifact to GitHub Releases') {
+            when {       
+                allOf {
+                    branch 'main'
+                    expression { env.SKIP_UPLOAD == 'false' }
+                }
+            }
+            agent { label 'agent1' }
             steps {
                 script {
-                    sh """
-                    docker build -t ${DOCKER_IMAGE_NAME}:latest -f Dockerfile.app .
-                    docker push ${DOCKER_IMAGE_NAME}:latest
-                    """
+                    def releaseUrl = "https://api.github.com/repos/${GITHUB_REPO}/releases"
+                    def releaseData = """{
+                        "tag_name": "${env.VERSION}",
+                        "name": "Release ${env.VERSION}",
+                        "body": "Release notes"
+                    }"""
+                    
+                    def existingRelease = sh(script: """
+                        curl -H "Authorization: token \$GITHUB_TOKEN" \
+                             -H "Accept: application/vnd.github.v3+json" \
+                             ${releaseUrl}?per_page=100 | grep -o '"tag_name": "'${VERSION}'"' || true
+                    """, returnStdout: true).trim()
+                    
+                    if (!existingRelease) {
+                        def createReleaseResponse = sh(script: """
+                            curl -H "Authorization: token \$GITHUB_TOKEN" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 -X POST \
+                                 -d '${releaseData}' \
+                                 ${releaseUrl}
+                        """, returnStdout: true).trim()
+                        def releaseId = sh(script: """
+                            echo '${createReleaseResponse}' | jq -r '.id'
+                        """, returnStdout: true).trim()
+
+                        if (!releaseId) {
+                            error "Failed to extract releaseId from response."
+                        }
+
+                        def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
+
+                        sh """
+                        curl -H "Authorization: token \$GITHUB_TOKEN" \
+                             -H "Content-Type: application/octet-stream" \
+                             --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
+                             "${uploadUrl}"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Artifact') {
+            when {
+                branch 'main'
+            }
+            agent { label 'agent1' }
+            steps {
+                script {
+                    sh '''
+                        echo "Copying artifact to /vagrant/docker..."
+                        cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
+                    '''
+                }
+            }
+        }
+        
+        stage('Build and Push Docker Image of App') {
+            when {
+                branch 'main'
+            }
+            agent { label 'agent1' }
+            steps {
+                script {
+                    sh '''
+                        echo "Building Docker image..."
+                        cd /vagrant/docker
+			cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
+                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=$VERSION -t $APP_IMAGE_NAME:$VERSION -t $APP_IMAGE_NAME:latest .
+                        docker push ${APP_IMAGE_NAME}:${VERSION}
+                        docker push ${APP_IMAGE_NAME}:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Build and Push Docker Image of Mongo') {
+	        when {       
+                allOf {
+                    branch 'main'
+                    expression { env.BUILD_MONGO_INAGE == 'true' }
+                }
+            }
+            agent { label 'agent1' }
+            steps {
+                script {
+                    def indexFileChanged = sh(script: "git diff --name-only HEAD~1 | grep bin/mongodb/indexes.js", returnStatus: true) == 0
+                    if (indexFileChanged) {
+                        echo "Changes detected in indexes.js. Building Docker image."
+                        sh '''
+                            cd /vagrant/docker
+                            docker build -f Dockerfile.mongo --build-arg -t $MONGO_IMAGE_NAME:$VERSION -t $MONGO_IMAGE_NAME:latest .
+                            docker push ${MONGO_IMAGE_NAME}:${VERSION}
+                            docker push ${MONGO_IMAGE_NAME}:latest
+                        '''
+                    } else {
+                        echo "No changes in indexes.js. Skipping Docker build."
+                        return
+                    }
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
+            when {
+                branch 'main/*'
+            }
             steps {
                 script {
-                    sh """
-                    kubectl set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest --kubeconfig ~/.kube/config
-                    kubectl rollout status deployment/lila-service --kubeconfig ~/.kube/config
-                    """
+                    withCredentials([file(credentialsId: 'KUBECONFIG', variable: 'KUBECONFIG')]) {
+                        sh '''
+                            echo "Checking KUBECONFIG permissions and content"
+                            ls -l $KUBECONFIG
+                            cat $KUBECONFIG
+                            chmod 600 $KUBECONFIG
+                            echo "Using kubeconfig: $KUBECONFIG"
+                            kubectl version --client
+                            kubectl config set-cluster my-cluster --server=http://192.168.59.101:6443 --kubeconfig=$KUBECONFIG
+                            kubectl config set-context my-context --cluster=minikube --user=minikube --kubeconfig=$KUBECONFIG
+                            kubectl config use-context my-context --kubeconfig=$KUBECONFIG
+                            kubectl set image deployment/lila lila=${APP_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
+                            kubectl rollout status deployment/lila --kubeconfig=$KUBECONFIG
+                            if git diff --name-only HEAD~1 | grep -qE 'Dockerfile.mongo|bin/mongodb/indexes.js'; then
+                                echo "Changes detected in MongoDB-related files. Updating MongoDB image."
+                                kubectl set image deployment/mongo mongo=${MONGO_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
+                                kubectl rollout status deployment/mongo --kubeconfig=$KUBECONFIG || true
+                            else
+                                echo "No changes in MongoDB files. Skipping MongoDB image update."
+                            fi
+                        '''
+                    }
                 }
             }
         }
-
-#        stage('Run Tests on Cluster') {
- #           steps {
-  #              script {
-  #                  // Наприклад, виклик e2e тестів
-  #                  sh 'kubectl run e2e-tests --image=your-e2e-image --kubeconfig ~/.kube/config'
-  #              }
-  #          }
-  #      }
-  #  }
+    }
 
     post {
         always {
@@ -120,4 +288,3 @@ pipeline {
         }
     }
 }
-
