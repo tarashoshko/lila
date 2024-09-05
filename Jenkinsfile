@@ -3,9 +3,8 @@ pipeline {
 
     environment {
         ARTIFACT_PATH = '/home/vagrant/lila/target'
-	    DB_SETUP_FILE_PATH = '/home/vagrant/lila/bin/mongodb/indexes.js'
+	DB_SETUP_FILE_PATH = '/home/vagrant/lila/bin/mongodb/indexes.js'
         GITHUB_REPO = 'tarashoshko/lila'
-        GIT_BRANCH = 'main'
         GITHUB_TOKEN = credentials('Github_token')
         GITHUB_CREDENTIALS_ID = 'GIT_SSH'
         SBIN_PATH = '/home/vagrant/.local/share/coursier/bin'
@@ -72,7 +71,9 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
 			echo "Artifact file set to: ${ARTIFACT_FILE}"
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --all'
-                        def changes = sh(script: 'git diff --name-only origin/${GIT_BRANCH}', returnStdout: true).trim()
+			def branchName = env.BRANCH_NAME
+                	def changes = sh(script: "git diff --name-only origin/${branchName}", returnStdout: true).trim()
+                
                         if (changes.contains('ui/')) {
                             env.BUILD_UI = 'true'
                             env.BUILD_BACKEND = 'true'
@@ -103,11 +104,8 @@ pipeline {
         }
 
         stage('Build UI') {
-            when {       
-                allOf {
-                    branch 'dev'
-                    expression { env.BUILD_UI == 'true' }
-                }
+            when {
+                environment name: 'BUILD_UI', value: 'true'
             }
             agent { label 'agent1' }
             steps {
@@ -118,11 +116,8 @@ pipeline {
         }
 
         stage('Build App') {
-            when {       
-                allOf {
-                    branch 'dev'
-                    expression { env.BUILD_BACKEND == 'true' }
-                }
+            when {
+                environment name: 'BUILD_BACKEND', value: 'true'
             }
             agent { label 'agent1' }
             steps {
@@ -137,11 +132,8 @@ pipeline {
         }
 	    
         stage('Upload Artifact to GitHub Releases') {
-            when {       
-                allOf {
-                    branch 'main'
-                    expression { env.SKIP_UPLOAD == 'false' }
-                }
+            when {
+                environment name: 'SKIP_UPLOAD', value: 'false'
             }
             agent { label 'agent1' }
             steps {
@@ -189,9 +181,6 @@ pipeline {
         }
 
         stage('Prepare Artifact') {
-            when {
-                branch 'main'
-            }
             agent { label 'agent1' }
             steps {
                 script {
@@ -204,9 +193,6 @@ pipeline {
         }
         
         stage('Build and Push Docker Image of App') {
-            when {
-                branch 'main'
-            }
             agent { label 'agent1' }
             steps {
                 script {
@@ -223,11 +209,8 @@ pipeline {
         }
 
         stage('Build and Push Docker Image of Mongo') {
-	        when {       
-                allOf {
-                    branch 'main'
-                    expression { env.BUILD_MONGO_INAGE == 'true' }
-                }
+	    when {
+                environment name: 'BUILD_MONGO_INAGE', value: 'true'
             }
             agent { label 'agent1' }
             steps {
@@ -250,9 +233,6 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-            when {
-                branch 'main/*'
-            }
             steps {
                 script {
                     withCredentials([file(credentialsId: 'KUBECONFIG', variable: 'KUBECONFIG')]) {
