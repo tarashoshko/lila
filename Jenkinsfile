@@ -32,6 +32,43 @@ pipeline {
             }
         }
 
+        stage('Get Tag') {
+            steps {
+                script {
+                    withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
+                        sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
+                        
+                        def tag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
+                        
+                        if (tag) {
+                            env.VERSION = tag
+                        } else {
+                            echo "No tag found. Fetching the latest release version from GitHub."
+                            def latestReleaseResponse = sh(script: "curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" https://api.github.com/repos/${GITHUB_REPO}/releases/latest", returnStdout: true).trim()
+                            def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
+                            env.VERSION = latestReleaseTag
+                        }
+                        
+                        echo "Using version: ${env.VERSION}"
+                    }
+                }
+            }
+        }
+
+        stage('Check for Existing Release') {
+            steps {
+                script {
+                    def releaseExists = sh(script: "curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${VERSION} | grep 'Not Found'", returnStatus: true) != 0
+                    if (!releaseExists) {
+                        echo "Release with tag ${VERSION} already exists. Skipping artifact upload."
+                        env.SKIP_UPLOAD = 'true'
+                    } else {
+                        env.SKIP_UPLOAD = 'false'
+                    }
+                }
+            }
+        }
+
         stage('Check for Changes') {
             steps {
                 script {
@@ -88,7 +125,67 @@ pipeline {
                 }
             }
         }
+        stage('Upload Artifact to GitHub Releases') {
+            when {
+                environment name: 'SKIP_UPLOAD', value: 'false'
+            }
+            agent { label 'agent1' }
+            steps {
+                script {
+                    def releaseUrl = "https://api.github.com/repos/${GITHUB_REPO}/releases"
+                    def releaseData = """{
+                        "tag_name": "${env.VERSION}",
+                        "name": "Release ${env.VERSION}",
+                        "body": "Release notes"
+                    }"""
+                    
+                    def existingRelease = sh(script: """
+                        curl -H "Authorization: token \$GITHUB_TOKEN" \
+                             -H "Accept: application/vnd.github.v3+json" \
+                             ${releaseUrl}?per_page=100 | grep -o '"tag_name": "'${VERSION}'"' || true
+                    """, returnStdout: true).trim()
+                    
+                    if (!existingRelease) {
+                        def createReleaseResponse = sh(script: """
+                            curl -H "Authorization: token \$GITHUB_TOKEN" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 -X POST \
+                                 -d '${releaseData}' \
+                                 ${releaseUrl}
+                        """, returnStdout: true).trim()
+                        def releaseId = sh(script: """
+                            echo '${createReleaseResponse}' | jq -r '.id'
+                        """, returnStdout: true).trim()
 
+                        if (!releaseId) {
+                            error "Failed to extract releaseId from response."
+                        }
+
+                        def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
+
+                        sh """
+                        curl -H "Authorization: token \$GITHUB_TOKEN" \
+                             -H "Content-Type: application/octet-stream" \
+                             --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
+                             "${uploadUrl}"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Artifact') {
+            agent { label 'agent1' }
+            steps {
+                script {
+                    sh '''
+                        echo "Copying artifact to /vagrant/docker..."
+                        cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
+                    '''
+                }
+            }
+        }
+        
          stage('Build and Push Docker Image of App') {
             agent { label 'agent1' }
             steps {
@@ -96,7 +193,7 @@ pipeline {
                     sh '''
                         echo "Building Docker image..."
                         cd /vagrant/docker
-                        docker build -f $DOCKERFILE_APP_PATH -t $APP_IMAGE_NAME .
+                        docker build -f Dockerfile.app --build-arg LILA_VERSION=$VERSION -t $APP_IMAGE_NAME:$VERSION -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
                     '''
@@ -113,7 +210,7 @@ pipeline {
                         echo "Changes detected in indexes.js. Building Docker image."
                         sh '''
                             cd /vagrant/docker
-                            docker build -f $DOCKERFILE_MONGO_PATH -t $MONGO_IMAGE_NAME .
+                            docker build -f Dockerfile.mongo --build-arg -t $MONGO_IMAGE_NAME:$VERSION -t $MONGO_IMAGE_NAME:latest .
                             docker push ${MONGO_IMAGE_NAME}:${VERSION}
                             docker push ${MONGO_IMAGE_NAME}:latest
                         '''
