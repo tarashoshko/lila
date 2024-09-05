@@ -37,33 +37,23 @@ pipeline {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
-                        
-                        def tag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
-                        
+        
+                        def tag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
+        
                         if (tag) {
-                            env.VERSION = tag
+                            env.VERSION = tag.split('\n')[0]
+                            echo "Tag found for the current commit: ${env.VERSION}"
+                            env.SKIP_UPLOAD = 'false'
                         } else {
-                            echo "No tag found. Fetching the latest release version from GitHub."
+                            echo "No tag found for the current commit. Fetching the latest release version from GitHub."
                             def latestReleaseResponse = sh(script: "curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" https://api.github.com/repos/${GITHUB_REPO}/releases/latest", returnStdout: true).trim()
                             def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
                             env.VERSION = latestReleaseTag
+                            echo "Using latest release version: ${env.VERSION}"
+                            env.SKIP_UPLOAD = 'true'
                         }
                         
-                        echo "Using version: ${env.VERSION}"
-                    }
-                }
-            }
-        }
-
-        stage('Check for Existing Release') {
-            steps {
-                script {
-                    def releaseExists = sh(script: "curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${VERSION} | grep 'Not Found'", returnStatus: true) != 0
-                    if (!releaseExists) {
-                        echo "Release with tag ${VERSION} already exists. Skipping artifact upload."
-                        env.SKIP_UPLOAD = 'true'
-                    } else {
-                        env.SKIP_UPLOAD = 'false'
+                        echo "Version to be used: ${env.VERSION}"
                     }
                 }
             }
@@ -236,8 +226,8 @@ pipeline {
                             kubectl config set-cluster my-cluster --server=http://192.168.59.101:6443 --kubeconfig=$KUBECONFIG
                             kubectl config set-context my-context --cluster=minikube --user=minikube --kubeconfig=$KUBECONFIG
                             kubectl config use-context my-context --kubeconfig=$KUBECONFIG
-                            kubectl set image deployment/lila lila-service=${APP_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
-                            kubectl rollout status deployment/lila-service --kubeconfig=$KUBECONFIG
+                            kubectl set image deployment/lila lila=${APP_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
+                            kubectl rollout status deployment/lila --kubeconfig=$KUBECONFIG
                             if git diff --name-only HEAD~1 | grep -qE 'Dockerfile.mongo|bin/mongodb/indexes.js'; then
                                 echo "Changes detected in MongoDB-related files. Updating MongoDB image."
                                 kubectl set image deployment/mongo mongo=${MONGO_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
