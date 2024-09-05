@@ -72,7 +72,9 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
 			echo "Artifact file set to: ${ARTIFACT_FILE}"
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --all'
-                        def changes = sh(script: 'git diff --name-only origin/${GIT_BRANCH}', returnStdout: true).trim()
+			def branchName = env.BRANCH_NAME
+                	def changes = sh(script: "git diff --name-only origin/${branchName}", returnStdout: true).trim()
+                
                         if (changes.contains('ui/')) {
                             env.BUILD_UI = 'true'
                             env.BUILD_BACKEND = 'true'
