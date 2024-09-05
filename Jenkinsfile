@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         ARTIFACT_PATH = '/home/vagrant/lila/target'
+	DB_SETUP_FILE_PATH = '/home/vagrant/lila/bin/mongodb/indexes.js'
         GITHUB_REPO = 'tarashoshko/lila'
         GIT_BRANCH = 'main'
         GITHUB_TOKEN = credentials('Github_token')
@@ -34,7 +35,7 @@ pipeline {
 
         stage('Get Tag') {
             steps {
-                script {
+                 script {
                     // Fetch latest commit tags
                     def gitTag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
                     echo "Latest commit tags: ${gitTag}"
@@ -198,7 +199,8 @@ pipeline {
                     sh '''
                         echo "Building Docker image..."
                         cd /vagrant/docker
-                        docker build -f Dockerfile.app --build-arg LILA_VERSION=$VERSION -t $APP_IMAGE_NAME:$VERSION -t $APP_IMAGE_NAME:latest .
+			cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
+                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=$VERSION -t $APP_IMAGE_NAME:$VERSION -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
                     '''
