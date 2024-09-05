@@ -43,6 +43,7 @@ pipeline {
                         echo "Tags for current commit: ${tags}"
         
                         if (tags) {
+                            // Вибір першого тегу з отриманого списку
                             env.VERSION = tags.split('\n')[0].trim()
                             echo "Tag found for the current commit: ${env.VERSION}"
                             env.SKIP_UPLOAD = 'false'
@@ -75,7 +76,7 @@ pipeline {
                     }
                 }
             }
-        }
+}
 
 
         stage('Check for Changes') {
