@@ -103,8 +103,12 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                    withCredentials([file(credentialsId: 'KUBECONFIG', variable: 'KUBECONFIG')]) {
                         sh '''
+                            echo "Checking KUBECONFIG permissions and content"
+                            ls -l $KUBECONFIG
+                            cat $KUBECONFIG
+                            chmod 600 $KUBECONFIG
                             echo "Using kubeconfig: $KUBECONFIG"
                             kubectl version --client
                             kubectl config set-cluster my-cluster --server=http://192.168.59.101:6443 --kubeconfig=$KUBECONFIG
