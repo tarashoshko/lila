@@ -9,6 +9,9 @@ pipeline {
         GITHUB_CREDENTIALS_ID = 'GIT_SSH'
         SBIN_PATH = '/home/vagrant/.local/share/coursier/bin'
         DOCKER_IMAGE_NAME = 'tarashoshko/lila-app'
+        DOCKER_MONGO_IMAGE_NAME = "tarashoshko/custom-mongo"
+        DOCKERFILE_APP_PATH = "Dockerfile.app"
+        DOCKERFILE_MONGO_PATH = "Dockerfile.mongo"
         CLUSTER_IP = '192.168.59.101'
         DEFAULT_VERSION = '1.0.0'
         VERSION = "${DEFAULT_VERSION}"
@@ -87,15 +90,47 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build and Push Docker Image of App') {
             agent { label 'agent1' }
             steps {
                 script {
-                    sh """
-                    cd /vagrant/docker
-                    docker build -t ${DOCKER_IMAGE_NAME}:latest -f Dockerfile.app .
-                    docker push ${DOCKER_IMAGE_NAME}:latest
-                    """
+                    def indexFileChanged = sh(script: "git diff --name-only HEAD~1 | grep bin/mongodb/indexes.js", returnStatus: true) == 0
+                    if (indexFileChanged) {
+                        echo "Changes detected in indexes.js. Building Docker image."
+                        sh '''
+                            docker build -t ${DOCKER_IMAGE_NAME}:latest -f Dockerfile.mongo .
+                            docker push ${DOCKER_IMAGE_NAME}:latest
+                        '''
+                    } else {
+                        echo "No changes in indexes.js. Skipping Docker build."
+                        return
+                    }
+                }
+            }
+        }
+
+        stage('Check for Changes in indexes.js') {
+            steps {
+                script {
+                    def changes = sh(script: 'git diff --name-only HEAD~1 HEAD | grep bin/mongodb/indexes.js || true', returnStdout: true).trim()
+                    if (changes) {
+                        echo "Changes detected in indexes.js. Proceeding to Docker build."
+                    } else {
+                        echo "No changes in indexes.js. Skipping Docker build."
+                        currentBuild.result = 'SUCCESS'
+                        return
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh '''
+                        echo "Building Docker image..."
+                        docker build -f $DOCKERFILE_PATH -t $DOCKER_IMAGE_NAME .
+                    '''
                 }
             }
         }
@@ -114,8 +149,15 @@ pipeline {
                             kubectl config set-cluster my-cluster --server=http://192.168.59.101:6443 --kubeconfig=$KUBECONFIG
                             kubectl config set-context my-context --cluster=minikube --user=minikube --kubeconfig=$KUBECONFIG
                             kubectl config use-context my-context --kubeconfig=$KUBECONFIG
-                            kubectl set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
+                            kubectl set image deployment/lila lila-service=${DOCKER_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
                             kubectl rollout status deployment/lila-service --kubeconfig=$KUBECONFIG
+                            if git diff --name-only HEAD~1 | grep -qE 'Dockerfile.mongo|bin/mongodb/indexes.js'; then
+                                echo "Changes detected in MongoDB-related files. Updating MongoDB image."
+                                kubectl set image deployment/mongo mongo=${MONGO_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
+                                kubectl rollout status deployment/mongo --kubeconfig=$KUBECONFIG || true
+                            else
+                                echo "No changes in MongoDB files. Skipping MongoDB image update."
+                            fi
                         '''
                     }
                 }
