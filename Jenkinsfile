@@ -61,13 +61,10 @@ pipeline {
                     }
 
                     ARTIFACT_FILE = "lila_${VERSION}_all.deb"
-                    echo "Artifact file set to: ${ARTIFACT_FILE}"
-                    
+                    echo "Artifact file set to: ${ARTIFACT_FILE}"                    
                 }
             }
         }
-
-
 
         stage('Check for Changes') {
             steps {
