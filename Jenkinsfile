@@ -84,7 +84,11 @@ pipeline {
                             env.BUILD_BACKEND = 'true'
                         }
 
-			if (changes.contains('ui/mon'))
+			if (changes.contains('bin/mongodb/indexes.js')) {
+	                    env.BUILD_MONGO_INAGE = 'true'
+	                } else {
+	                    env.BUILD_MONGO_INAGE = 'false'
+	                }
                     }
                 }
             }
@@ -128,6 +132,7 @@ pipeline {
                 }
             }
         }
+	    
         stage('Upload Artifact to GitHub Releases') {
             when {
                 environment name: 'SKIP_UPLOAD', value: 'false'
@@ -189,7 +194,7 @@ pipeline {
             }
         }
         
-         stage('Build and Push Docker Image of App') {
+        stage('Build and Push Docker Image of App') {
             agent { label 'agent1' }
             steps {
                 script {
@@ -206,6 +211,9 @@ pipeline {
         }
 
         stage('Build and Push Docker Image of Mongo') {
+	    when {
+                environment name: 'BUILD_MONGO_INAGE', value: 'true'
+            }
             agent { label 'agent1' }
             steps {
                 script {
