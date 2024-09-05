@@ -46,13 +46,13 @@ pipeline {
                             env.SKIP_UPLOAD = 'false'
                         } else {
                             echo "No tag found for the current commit. Fetching the latest release version from GitHub."
-                            def latestReleaseResponse = sh(script: "curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" https://api.github.com/repos/${GITHUB_REPO}/releases/latest", returnStdout: true).trim()
+                            def latestReleaseResponse = sh(script: 'curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${GITHUB_REPO}/releases/latest', returnStdout: true).trim()
+                            echo "Latest release response: ${latestReleaseResponse}"
                             def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
                             env.VERSION = latestReleaseTag
                             echo "Using latest release version: ${env.VERSION}"
                             env.SKIP_UPLOAD = 'true'
-                        }
-                        
+                        }                        
                         echo "Version to be used: ${env.VERSION}"
                     }
                 }
