@@ -95,6 +95,7 @@ pipeline {
                 script {
                     sh '''
                         echo "Building Docker image..."
+                        cd /vagrant/docker
                         docker build -f $DOCKERFILE_APP_PATH -t $APP_IMAGE_NAME .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
@@ -111,6 +112,7 @@ pipeline {
                     if (indexFileChanged) {
                         echo "Changes detected in indexes.js. Building Docker image."
                         sh '''
+                            cd /vagrant/docker
                             docker build -f $DOCKERFILE_MONGO_PATH -t $MONGO_IMAGE_NAME .
                             docker push ${MONGO_IMAGE_NAME}:${VERSION}
                             docker push ${MONGO_IMAGE_NAME}:latest
