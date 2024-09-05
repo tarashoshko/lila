@@ -36,6 +36,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
+                        // Оновлення тегів
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
         
                         // Отримання тегів, які містять поточний коміт
@@ -56,7 +57,8 @@ pipeline {
         
                             try {
                                 // Парсинг JSON
-                                def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
+                                def latestRelease = readJSON(text: latestReleaseResponse)
+                                def latestReleaseTag = latestRelease.tag_name
                                 echo "Latest release tag: ${latestReleaseTag}"
                                 
                                 if (latestReleaseTag) {
@@ -76,7 +78,8 @@ pipeline {
                     }
                 }
             }
-}
+        }
+
 
 
         stage('Check for Changes') {
