@@ -53,16 +53,21 @@ pipeline {
                             def latestReleaseResponse = sh(script: 'curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${GITHUB_REPO}/releases/latest', returnStdout: true).trim()
                             echo "Latest release response: ${latestReleaseResponse}"
         
-                            // Парсинг JSON
-                            def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
-                            echo "Latest release tag: ${latestReleaseTag}"
-                            
-                            if (latestReleaseTag) {
-                                env.VERSION = latestReleaseTag
-                                echo "Using latest release version: ${env.VERSION}"
-                                env.SKIP_UPLOAD = 'true'
-                            } else {
-                                error "Failed to fetch the latest release tag from GitHub."
+                            try {
+                                // Парсинг JSON
+                                def latestReleaseTag = readJSON(text: latestReleaseResponse).tag_name
+                                echo "Latest release tag: ${latestReleaseTag}"
+                                
+                                if (latestReleaseTag) {
+                                    env.VERSION = latestReleaseTag
+                                    echo "Using latest release version: ${env.VERSION}"
+                                    env.SKIP_UPLOAD = 'true'
+                                } else {
+                                    error "Failed to fetch the latest release tag from GitHub."
+                                }
+                            } catch (Exception e) {
+                                echo "Error parsing JSON response: ${e.message}"
+                                error "Failed to process the latest release response."
                             }
                         }
                         
@@ -71,6 +76,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('Check for Changes') {
             steps {
