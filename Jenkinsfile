@@ -35,47 +35,39 @@ pipeline {
         stage('Get Tag') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
-                        // Оновлення тегів
-                        sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --tags'
-        
-                        // Отримання тегів, які містять поточний коміт
-                        def tags = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
-                        echo "Tags for current commit: ${tags}"
-        
-                        if (tags) {
-                            // Вибір першого тегу з отриманого списку
-                            env.VERSION = tags.split('\n')[0].trim()
-                            echo "Tag found for the current commit: ${env.VERSION}"
+                    // Fetch latest commit tags
+                    def gitTag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
+                    echo "Latest commit tags: ${gitTag}"
+
+                    // Check if we have tags
+                    if (gitTag) {
+                        // Check if the tag is already in releases
+                        def tagExists = sh(script: """
+                            curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+                            https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
+                            | grep -q 'not found'
+                        """, returnStatus: true) == 0
+
+                        if (!tagExists) {
+                            // Tag exists in releases
+                            echo "Tag '${gitTag}' already exists in releases."
+                            VERSION = gitTag
                             env.SKIP_UPLOAD = 'false'
                         } else {
-                            echo "No tag found for the current commit. Fetching the latest release version from GitHub."
-                            
-                            // Отримання останнього релізу
-                            def latestReleaseResponse = sh(script: 'curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${GITHUB_REPO}/releases/latest', returnStdout: true).trim()
-                            echo "Latest release response: ${latestReleaseResponse}"
-        
-                            try {
-                                // Парсинг JSON
-                                def latestRelease = readJSON(text: latestReleaseResponse)
-                                def latestReleaseTag = latestRelease.tag_name
-                                echo "Latest release tag: ${latestReleaseTag}"
-                                
-                                if (latestReleaseTag) {
-                                    env.VERSION = latestReleaseTag
-                                    echo "Using latest release version: ${env.VERSION}"
-                                    env.SKIP_UPLOAD = 'true'
-                                } else {
-                                    error "Failed to fetch the latest release tag from GitHub."
-                                }
-                            } catch (Exception e) {
-                                echo "Error parsing JSON response: ${e.message}"
-                                error "Failed to process the latest release response."
-                            }
+                            // Tag does not exist in releases, use default version
+                            echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
+                            VERSION = DEFAULT_VERSION
+                            env.SKIP_UPLOAD = 'true'
                         }
-                        
-                        echo "Version to be used: ${env.VERSION}"
+                    } else {
+                        // No tags found, use default version
+                        echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
+                        VERSION = DEFAULT_VERSION
                     }
+
+                    ARTIFACT_FILE = "lila_${VERSION}_all.deb"
+                    echo "Artifact file set to: ${ARTIFACT_FILE}"
+                    
                 }
             }
         }
