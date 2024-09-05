@@ -36,13 +36,10 @@ pipeline {
         stage('Get Tag') {
             steps {
                  script {
-                    // Fetch latest commit tags
                     def gitTag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
                     echo "Latest commit tags: ${gitTag}"
 
-                    // Check if we have tags
                     if (gitTag) {
-                        // Check if the tag is already in releases
                         def tagExists = sh(script: """
                             curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
                             https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
@@ -50,18 +47,15 @@ pipeline {
                         """, returnStatus: true) == 0
 
                         if (!tagExists) {
-                            // Tag exists in releases
                             echo "Tag '${gitTag}' already exists in releases."
                             VERSION = gitTag
                             env.SKIP_UPLOAD = 'false'
                         } else {
-                            // Tag does not exist in releases, use default version
                             echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
                             VERSION = DEFAULT_VERSION
                             env.SKIP_UPLOAD = 'true'
                         }
                     } else {
-                        // No tags found, use default version
                         echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
                         VERSION = DEFAULT_VERSION
                     }
@@ -79,6 +73,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
+			echo "Artifact file set to: ${ARTIFACT_FILE}"
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --all'
                         def changes = sh(script: 'git diff --name-only origin/${GIT_BRANCH}', returnStdout: true).trim()
                         if (changes.contains('ui/')) {
@@ -88,6 +83,8 @@ pipeline {
                             env.BUILD_UI = 'false'
                             env.BUILD_BACKEND = 'true'
                         }
+
+			if (changes.contains('ui/mon'))
                     }
                 }
             }
