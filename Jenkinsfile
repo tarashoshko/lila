@@ -103,16 +103,16 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    withCredentials([file(credentialsId: 'KUBECONFIG', variable: 'KUBECONFIG')]) {
-                        sh '''
+                    sh '''
                         kubectl version --client
                         kubectl config set-cluster my-cluster --server=http://192.168.59.101:6443 --kubeconfig=$KUBECONFIG
-                        kubectl config set-context my-context --cluster=my-cluster --user=my-user --kubeconfig=$KUBECONFIG
+                        kubectl config set-context my-context --cluster=minikube --user=minikube --kubeconfig=$KUBECONFIG
                         kubectl config use-context my-context --kubeconfig=$KUBECONFIG
-                        kubectl set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest
-                        kubectl rollout status deployment/lila-service
+                        kubectl set image deployment/lila-service lila-service=${DOCKER_IMAGE_NAME}:latest --kubeconfig=$KUBECONFIG
+                        kubectl rollout status deployment/lila-service --kubeconfig=$KUBECONFIG || true
+                        echo "Failure occurred, printing full log:"
+                        cat /path/to/jenkins/log
                         '''
-                    }
                 }
             }
         }
