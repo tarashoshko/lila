@@ -4,7 +4,7 @@
 
 http.port = 9663
 mongodb {
-  uri = ${?MONGO_DOMAIN}
+  uri = "mongodb://10.0.0.3:27017/lila"
   mongo-async-driver = ${akka}
   yolo {
     uri = ${mongodb.uri}
@@ -355,7 +355,7 @@ memo {
   }
 }
 redis {
-  uri = ${?REDIS_DOMAIN}
+  uri = "redis://127.0.0.1"
   # uri = "redis-socket:///var/run/redis/redis-server.sock"
 }
 socket {
@@ -456,4 +456,3 @@ kamon {
 }
 # Don't let play manage its own PID file
 pidfile.path = "/dev/null"
-  uri = "mongodb://admin:admin@10.0.0.3:27017/lila"
