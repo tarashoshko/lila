@@ -34,38 +34,40 @@ pipeline {
         }
 
         stage('Get Tag') {
-            steps {
-                script {
-                    def gitTag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
-		    echo "Latest tag: ${gitTag}"
+	    steps {
+	        script {
+	            sh 'git fetch --tags'
+	
+	            def gitTag = sh(script: 'git describe --tags --abbrev=0 || git tag --sort=-v:refname | head -n 1', returnStdout: true).trim()
+	            echo "Latest tag: ${gitTag}"
+	
+	            if (gitTag) {
+	                def tagExists = sh(script: """
+	                    curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+	                    https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
+	                    | grep -q 'not found'
+	                """, returnStatus: true) == 0
+	
+	                if (!tagExists) {
+	                    echo "Tag '${gitTag}' already exists in releases."
+	                    VERSION = gitTag
+	                    env.SKIP_UPLOAD = 'false'
+	                } else {
+	                    echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
+	                    VERSION = DEFAULT_VERSION
+	                    env.SKIP_UPLOAD = 'true'
+	                }
+	            } else {
+	                echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
+	                VERSION = DEFAULT_VERSION
+	            }
+	
+	            ARTIFACT_FILE = "lila_${VERSION}_all.deb"
+	            echo "Artifact file set to: ${ARTIFACT_FILE}"                    
+	        }
+	    }
+	}
 
-
-                    if (gitTag) {
-                        def tagExists = sh(script: """
-                            curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-                            https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
-                            | grep -q 'not found'
-                        """, returnStatus: true) == 0
-
-                        if (!tagExists) {
-                            echo "Tag '${gitTag}' already exists in releases."
-                            VERSION = gitTag
-                            env.SKIP_UPLOAD = 'false'
-                        } else {
-                            echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
-                            VERSION = DEFAULT_VERSION
-                            env.SKIP_UPLOAD = 'true'
-                        }
-                    } else {
-                        echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
-                        VERSION = DEFAULT_VERSION
-                    }
-
-                    ARTIFACT_FILE = "lila_${VERSION}_all.deb"
-                    echo "Artifact file set to: ${ARTIFACT_FILE}"                    
-                }
-            }
-        }
 
         stage('Check for Changes') {
             steps {
