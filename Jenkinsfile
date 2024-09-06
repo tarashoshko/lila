@@ -78,7 +78,6 @@ pipeline {
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: "${GITHUB_CREDENTIALS_ID}", keyFileVariable: 'GIT_SSH')]) {
-			echo "Artifact file set to: ${ARTIFACT_FILE}"
                         sh 'GIT_SSH_COMMAND="ssh -i ${GIT_SSH}" git fetch --all'
 			def branchName = env.BRANCH_NAME
                 	def changes = sh(script: "git diff --name-only origin/${branchName}", returnStdout: true).trim()
