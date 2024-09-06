@@ -206,10 +206,8 @@ pipeline {
                 script {
                     sh """
                         echo "Copying artifact to /vagrant/docker..."
-			echo "Artifact version is: ${ARTIFACT_FILE}"
-   			echo "App version is: ${env.VERSION}"
    			cd /home/vagrant/lila/target
-                        cp ${ARTIFACT_PATH}/lila_1.1.5_all.deb /vagrant/docker/
+                        cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
                     """
                 }
             }
