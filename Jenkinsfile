@@ -154,15 +154,15 @@ pipeline {
 	                "body": "Release notes"
 	            }"""
 	
-	            // Перевірка, чи існує реліз з таким тегом
+	            
+		    echo "Checking for existing release with tag ${VERSION}"
 	            def existingRelease = sh(script: """
 	                curl -H "Authorization: token \$GITHUB_TOKEN" \
 	                     -H "Accept: application/vnd.github.v3+json" \
-	                     ${releaseUrl}?per_page=100 | jq -r '.[] | select(.tag_name == "${env.VERSION}") | .id' || true
+	                     ${releaseUrl}?per_page=100 | jq -r '.[] | select(.tag_name == "${VERSION}") | .id' || true
 	            """, returnStdout: true).trim()
 	
 	            def releaseId = existingRelease
-	
 	            if (!existingRelease) {
 	                echo "Creating new release for tag ${VERSION}"
 	                def createReleaseResponse = sh(script: """
@@ -181,7 +181,7 @@ pipeline {
 	                    error "Failed to extract releaseId from response."
 	                }
 	            } else {
-	                echo "Release with tag ${env.VERSION} already exists. Using releaseId: ${releaseId}"
+	                echo "Release with tag ${VERSION} already exists. Using releaseId: ${releaseId}"
 	            }
 	
 	            def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
@@ -215,7 +215,7 @@ pipeline {
 		    echo "App version set to: ${VERSION}"
                     sh '''
                         cd /vagrant/docker
-                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=$VERSION -t $APP_IMAGE_NAME:$VERSION -t $APP_IMAGE_NAME:latest .
+                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION}-t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
                     '''
@@ -234,7 +234,7 @@ pipeline {
 	            	echo "Changes detected in indexes.js. Building Docker image."
 		    	cd /vagrant/docker			    
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
-		    	docker build -f Dockerfile.mongo --build-arg -t $MONGO_IMAGE_NAME:$VERSION -t $MONGO_IMAGE_NAME:latest .
+		    	docker build -f Dockerfile.mongo --build-arg -t $MONGO_IMAGE_NAME:${VERSION}-t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
 		    	docker push ${MONGO_IMAGE_NAME}:latest
 		    '''
