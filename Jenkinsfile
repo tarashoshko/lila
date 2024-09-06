@@ -48,8 +48,8 @@ pipeline {
 	                    | grep -q 'not found'
 	                """, returnStatus: true) == 0
 			if (gitTag.startsWith("v")) {
-	                	gitTag = gitTag.replaceFirst("v", "")
-				echo "Version without 'v': ${gitTag}"
+	                    gitTag = gitTag.replaceFirst("v", "")
+			    echo "Version without 'v': ${gitTag}"
 	            	}
 	                if (!tagExists) {
 	                    echo "Tag '${gitTag}' already exists in releases."
