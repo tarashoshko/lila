@@ -130,7 +130,7 @@ pipeline {
                     sh """
                     export PATH=\$PATH:${SBIN_PATH}
                     cd /home/vagrant/lila
-                    sbt -DVERSION=${env.VERSION} compile debian:packageBin
+                    sbt -DVERSION=${VERSION} compile debian:packageBin
                     """
                 }
             }
@@ -146,8 +146,8 @@ pipeline {
 		    echo "App version set to: ${VERSION}"
 	            def releaseUrl = "https://api.github.com/repos/${GITHUB_REPO}/releases"
 	            def releaseData = """{
-	                "tag_name": "${env.VERSION}",
-	                "name": "Release ${env.VERSION}",
+	                "tag_name": "${VERSION}",
+	                "name": "Release ${VERSION}",
 	                "body": "Release notes"
 	            }"""
 	
@@ -161,7 +161,7 @@ pipeline {
 	            def releaseId = existingRelease
 	
 	            if (!existingRelease) {
-	                echo "Creating new release for tag ${env.VERSION}"
+	                echo "Creating new release for tag ${VERSION}"
 	                def createReleaseResponse = sh(script: """
 	                    curl -H "Authorization: token \$GITHUB_TOKEN" \
 	                         -H "Accept: application/vnd.github.v3+json" \
