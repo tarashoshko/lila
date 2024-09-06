@@ -218,12 +218,12 @@ pipeline {
                 script {
 		    echo "Building Docker image..."
 		    echo "App version set to: ${VERSION}"
-                    sh '''
+                    sh """
 		    	cd /vagrant/docker
                         docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
-                    '''
+                    """
                 }
             }
         }
@@ -235,14 +235,14 @@ pipeline {
             agent { label 'agent1' }
             steps {
                 script {
-		    sh '''
+		    sh """
 	            	echo "Changes detected in indexes.js. Building Docker image."
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
        			cd /vagrant/docker
 		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
 		    	docker push ${MONGO_IMAGE_NAME}:latest
-		    '''
+		    """
                 }
             }
         }
