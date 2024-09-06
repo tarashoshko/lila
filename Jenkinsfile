@@ -189,8 +189,7 @@ pipeline {
 	                 -H "Content-Type: application/octet-stream" \
 	                 --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
 	                 "${uploadUrl}"
-	            """
-   		    echo "App version is: ${VERSION}" 
+	            """ 
 	        }
 	    }
 	}
