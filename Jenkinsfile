@@ -196,13 +196,18 @@ pipeline {
 
 
         stage('Prepare Artifact') {
+	    when {
+	        environment name: 'SKIP_UPLOAD', value: 'false'
+	    }
             agent { label 'agent1' }
             steps {
                 script {
                     sh '''
                         echo "Copying artifact to /vagrant/docker..."
-			echo "App version set to: ${ARTIFACT_FILE}"
-                        cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
+			echo "Artifact version is: ${ARTIFACT_FILE}"
+   			echo "App version is: ${VERSION}"
+   			cd /home/vagrant/lila/target
+                        cp ${ARTIFACT_FILE} /vagrant/docker/
                     '''
                 }
             }
