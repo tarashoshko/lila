@@ -54,6 +54,7 @@ pipeline {
 	                if (!tagExists) {
 	                    echo "Tag '${gitTag}' already exists in releases."
 	                    VERSION = gitTag
+			    env.VERSION = gitTag
 	                    env.SKIP_UPLOAD = 'false'
 			    echo "App version set to: ${VERSION}"
 	                } else {
@@ -206,9 +207,9 @@ pipeline {
                     sh '''
                         echo "Copying artifact to /vagrant/docker..."
 			echo "Artifact version is: ${ARTIFACT_FILE}"
-   			echo "App version is: ${VERSION}"
+   			echo "App version is: ${env.VERSION}"
    			cd /home/vagrant/lila/target
-                        cp ${ARTIFACT_PATH}/lila_${VERSION}_all.deb /vagrant/docker/
+                        cp ${ARTIFACT_PATH}/lila_${env.VERSION}_all.deb /vagrant/docker/
                     '''
                 }
             }
@@ -221,7 +222,6 @@ pipeline {
 		    echo "Building Docker image..."
 		    echo "App version set to: ${VERSION}"
                     sh '''
-                        cd /vagrant/docker
                         docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
@@ -239,7 +239,6 @@ pipeline {
                 script {
 		    sh '''
 	            	echo "Changes detected in indexes.js. Building Docker image."
-		    	cd /vagrant/docker			    
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
 		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
