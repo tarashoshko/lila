@@ -146,25 +146,24 @@ pipeline {
 	    agent { label 'agent1' }
 	    steps {
 	        script {
-		    echo "App version set to: ${VERSION}"
+	            echo "App version set to: ${VERSION}"
 	            def releaseUrl = "https://api.github.com/repos/${GITHUB_REPO}/releases"
 	            def releaseData = """{
-	                "tag_name": "${VERSION}",
+	                "tag_name": "v${VERSION}",
 	                "name": "Release ${VERSION}",
 	                "body": "Release notes"
 	            }"""
 	
-	            
-		    echo "Checking for existing release with tag ${VERSION}"
+	            echo "Checking for existing release with tag v${VERSION}"
 	            def existingRelease = sh(script: """
-	                curl -H "Authorization: token \$GITHUB_TOKEN" \
+	                curl -H "Authorization: token \${GITHUB_TOKEN}" \
 	                     -H "Accept: application/vnd.github.v3+json" \
-	                     ${releaseUrl}?per_page=100 | jq -r '.[] | select(.tag_name == "${VERSION}") | .id' || true
+	                     ${releaseUrl}?per_page=100 | jq -r '.[] | select(.tag_name == "v${VERSION}") | .id' || true
 	            """, returnStdout: true).trim()
 	
 	            def releaseId = existingRelease
 	            if (!existingRelease) {
-	                echo "Creating new release for tag ${VERSION}"
+	                echo "Creating new release for tag v${VERSION}"
 	                def createReleaseResponse = sh(script: """
 	                    curl -H "Authorization: token \$GITHUB_TOKEN" \
 	                         -H "Accept: application/vnd.github.v3+json" \
@@ -181,7 +180,7 @@ pipeline {
 	                    error "Failed to extract releaseId from response."
 	                }
 	            } else {
-	                echo "Release with tag ${VERSION} already exists. Using releaseId: ${releaseId}"
+	                echo "Release with tag v${VERSION} already exists. Using releaseId: ${releaseId}"
 	            }
 	
 	            def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
@@ -194,6 +193,7 @@ pipeline {
 	        }
 	    }
 	}
+
 
         stage('Prepare Artifact') {
             agent { label 'agent1' }
