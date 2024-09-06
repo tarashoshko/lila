@@ -35,9 +35,10 @@ pipeline {
 
         stage('Get Tag') {
             steps {
-                 script {
-                    def gitTag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
-                    echo "Latest commit tags: ${gitTag}"
+                script {
+                    def gitTag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
+		    echo "Latest tag: ${gitTag}"
+
 
                     if (gitTag) {
                         def tagExists = sh(script: """
