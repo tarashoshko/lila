@@ -190,6 +190,7 @@ pipeline {
 	                 --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
 	                 "${uploadUrl}"
 	            """
+   		    echo "App version is: ${VERSION}" 
 	        }
 	    }
 	}
