@@ -201,6 +201,7 @@ pipeline {
                 script {
                     sh '''
                         echo "Copying artifact to /vagrant/docker..."
+			echo "App version set to: ${ARTIFACT_FILE}"
                         cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
                     '''
                 }
@@ -215,7 +216,7 @@ pipeline {
 		    echo "App version set to: ${VERSION}"
                     sh '''
                         cd /vagrant/docker
-                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION}-t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
+                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
                     '''
@@ -234,7 +235,7 @@ pipeline {
 	            	echo "Changes detected in indexes.js. Building Docker image."
 		    	cd /vagrant/docker			    
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
-		    	docker build -f Dockerfile.mongo --build-arg -t $MONGO_IMAGE_NAME:${VERSION}-t $MONGO_IMAGE_NAME:latest .
+		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
 		    	docker push ${MONGO_IMAGE_NAME}:latest
 		    '''
