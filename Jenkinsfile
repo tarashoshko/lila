@@ -34,37 +34,44 @@ pipeline {
         }
 
         stage('Get Tag') {
-            steps {
-                 script {
-                    def gitTag = sh(script: 'git tag --contains HEAD', returnStdout: true).trim()
-                    echo "Latest commit tags: ${gitTag}"
+	    steps {
+	        script {
+	            sh 'git fetch --tags'
+	
+	            def gitTag = sh(script: 'git describe --tags --abbrev=0 || git tag --sort=-v:refname | head -n 1', returnStdout: true).trim()
+	            echo "Latest tag: ${gitTag}"	            
+			
+	            if (gitTag) {
+	                def tagExists = sh(script: """
+	                    curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+	                    https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
+	                    | grep -q 'not found'
+	                """, returnStatus: true) == 0
+			if (gitTag.startsWith("v")) {
+	                    gitTag = gitTag.replaceFirst("v", "")
+			    echo "Version without 'v': ${gitTag}"
+	            	}
+	                if (!tagExists) {
+	                    echo "Tag '${gitTag}' already exists in releases."
+	                    VERSION = gitTag
+	                    env.SKIP_UPLOAD = 'false'
+			    echo "App version set to: ${VERSION}"
+	                } else {
+	                    echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
+	                    VERSION = DEFAULT_VERSION
+	                    env.SKIP_UPLOAD = 'true'
+	                }
+	            } else {
+	                echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
+	                VERSION = DEFAULT_VERSION
+	            }
+	
+	            ARTIFACT_FILE = "lila_${VERSION}_all.deb"
+	            echo "Artifact file set to: ${ARTIFACT_FILE}"                    
+	        }
+	    }
+	}
 
-                    if (gitTag) {
-                        def tagExists = sh(script: """
-                            curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-                            https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
-                            | grep -q 'not found'
-                        """, returnStatus: true) == 0
-
-                        if (!tagExists) {
-                            echo "Tag '${gitTag}' already exists in releases."
-                            VERSION = gitTag
-                            env.SKIP_UPLOAD = 'false'
-                        } else {
-                            echo "Tag '${gitTag}' does not exist in releases, using default version '${DEFAULT_VERSION}'."
-                            VERSION = DEFAULT_VERSION
-                            env.SKIP_UPLOAD = 'true'
-                        }
-                    } else {
-                        echo "No tags found for the latest commit, using default version '${DEFAULT_VERSION}'."
-                        VERSION = DEFAULT_VERSION
-                    }
-
-                    ARTIFACT_FILE = "lila_${VERSION}_all.deb"
-                    echo "Artifact file set to: ${ARTIFACT_FILE}"                    
-                }
-            }
-        }
 
         stage('Check for Changes') {
             steps {
@@ -126,60 +133,67 @@ pipeline {
                     sh """
                     export PATH=\$PATH:${SBIN_PATH}
                     cd /home/vagrant/lila
-                    sbt -DVERSION=${env.VERSION} compile debian:packageBin
+                    sbt -DVERSION=${VERSION} compile debian:packageBin
                     """
                 }
             }
         }
 	    
         stage('Upload Artifact to GitHub Releases') {
-            when {
-                environment name: 'SKIP_UPLOAD', value: 'false'
-            }
-            agent { label 'agent1' }
-            steps {
-                script {
-                    def releaseUrl = "https://api.github.com/repos/${GITHUB_REPO}/releases"
-                    def releaseData = """{
-                        "tag_name": "${env.VERSION}",
-                        "name": "Release ${env.VERSION}",
-                        "body": "Release notes"
-                    }"""
-                    
-                    def existingRelease = sh(script: """
-                        curl -H "Authorization: token \$GITHUB_TOKEN" \
-                             -H "Accept: application/vnd.github.v3+json" \
-                             ${releaseUrl}?per_page=100 | grep -o '"tag_name": "'${VERSION}'"' || true
-                    """, returnStdout: true).trim()
-                    
-                    if (!existingRelease) {
-                        def createReleaseResponse = sh(script: """
-                            curl -H "Authorization: token \$GITHUB_TOKEN" \
-                                 -H "Accept: application/vnd.github.v3+json" \
-                                 -X POST \
-                                 -d '${releaseData}' \
-                                 ${releaseUrl}
-                        """, returnStdout: true).trim()
-                        def releaseId = sh(script: """
-                            echo '${createReleaseResponse}' | jq -r '.id'
-                        """, returnStdout: true).trim()
+	    when {
+	        environment name: 'SKIP_UPLOAD', value: 'false'
+	    }
+	    agent { label 'agent1' }
+	    steps {
+	        script {
+	            echo "App version set to: ${VERSION}"
+	            def releaseUrl = "https://api.github.com/repos/${GITHUB_REPO}/releases"
+	            def releaseData = """{
+	                "tag_name": "v${VERSION}",
+	                "name": "Release ${VERSION}",
+	                "body": "Release notes"
+	            }"""
+	
+	            echo "Checking for existing release with tag v${VERSION}"
+	            def existingRelease = sh(script: """
+	                curl -H "Authorization: token \${GITHUB_TOKEN}" \
+	                     -H "Accept: application/vnd.github.v3+json" \
+	                     ${releaseUrl}?per_page=100 | jq -r '.[] | select(.tag_name == "v${VERSION}") | .id' || true
+	            """, returnStdout: true).trim()
+	
+	            def releaseId = existingRelease
+	            if (!existingRelease) {
+	                echo "Creating new release for tag v${VERSION}"
+	                def createReleaseResponse = sh(script: """
+	                    curl -H "Authorization: token \$GITHUB_TOKEN" \
+	                         -H "Accept: application/vnd.github.v3+json" \
+	                         -X POST \
+	                         -d '${releaseData}' \
+	                         ${releaseUrl}
+	                """, returnStdout: true).trim()
+	
+	                releaseId = sh(script: """
+	                    echo '${createReleaseResponse}' | jq -r '.id'
+	                """, returnStdout: true).trim()
+	
+	                if (!releaseId) {
+	                    error "Failed to extract releaseId from response."
+	                }
+	            } else {
+	                echo "Release with tag v${VERSION} already exists. Using releaseId: ${releaseId}"
+	            }
+	
+	            def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
+	            sh """
+	            curl -H "Authorization: token \$GITHUB_TOKEN" \
+	                 -H "Content-Type: application/octet-stream" \
+	                 --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
+	                 "${uploadUrl}"
+	            """
+	        }
+	    }
+	}
 
-                        if (!releaseId) {
-                            error "Failed to extract releaseId from response."
-                        }
-
-                        def uploadUrl = "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${releaseId}/assets?name=${ARTIFACT_FILE}"
-
-                        sh """
-                        curl -H "Authorization: token \$GITHUB_TOKEN" \
-                             -H "Content-Type: application/octet-stream" \
-                             --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
-                             "${uploadUrl}"
-                        """
-                    }
-                }
-            }
-        }
 
         stage('Prepare Artifact') {
             agent { label 'agent1' }
@@ -187,6 +201,7 @@ pipeline {
                 script {
                     sh '''
                         echo "Copying artifact to /vagrant/docker..."
+			echo "App version set to: ${ARTIFACT_FILE}"
                         cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
                     '''
                 }
@@ -197,11 +212,11 @@ pipeline {
             agent { label 'agent1' }
             steps {
                 script {
+		    echo "Building Docker image..."
+		    echo "App version set to: ${VERSION}"
                     sh '''
-                        echo "Building Docker image..."
                         cd /vagrant/docker
-			cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
-                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=$VERSION -t $APP_IMAGE_NAME:$VERSION -t $APP_IMAGE_NAME:latest .
+                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
                     '''
@@ -216,19 +231,14 @@ pipeline {
             agent { label 'agent1' }
             steps {
                 script {
-                    def indexFileChanged = sh(script: "git diff --name-only HEAD~1 | grep bin/mongodb/indexes.js", returnStatus: true) == 0
-                    if (indexFileChanged) {
-                        echo "Changes detected in indexes.js. Building Docker image."
-                        sh '''
-                            cd /vagrant/docker
-                            docker build -f Dockerfile.mongo --build-arg -t $MONGO_IMAGE_NAME:$VERSION -t $MONGO_IMAGE_NAME:latest .
-                            docker push ${MONGO_IMAGE_NAME}:${VERSION}
-                            docker push ${MONGO_IMAGE_NAME}:latest
-                        '''
-                    } else {
-                        echo "No changes in indexes.js. Skipping Docker build."
-                        return
-                    }
+		    sh '''
+	            	echo "Changes detected in indexes.js. Building Docker image."
+		    	cd /vagrant/docker			    
+		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
+		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
+		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
+		    	docker push ${MONGO_IMAGE_NAME}:latest
+		    '''
                 }
             }
         }
