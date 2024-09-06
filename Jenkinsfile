@@ -207,7 +207,7 @@ pipeline {
 			echo "Artifact version is: ${ARTIFACT_FILE}"
    			echo "App version is: ${VERSION}"
    			cd /home/vagrant/lila/target
-                        cp ${ARTIFACT_FILE} /vagrant/docker/
+                        cp ${ARTIFACT_PATH}/lila_${VERSION}_all.deb /vagrant/docker/
                     '''
                 }
             }
