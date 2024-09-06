@@ -191,7 +191,7 @@ pipeline {
 	                 --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
 	                 "${uploadUrl}"
 	            """
-   		    echo "App version is: ${VERSION}" 
+   		    echo "App version is: ${env.VERSION}" 
 	        }
 	    }
 	}
@@ -209,7 +209,7 @@ pipeline {
 			echo "Artifact version is: ${ARTIFACT_FILE}"
    			echo "App version is: ${env.VERSION}"
    			cd /home/vagrant/lila/target
-                        cp ${ARTIFACT_PATH}/lila_${env.VERSION}_all.deb /vagrant/docker/
+                        cp ${ARTIFACT_PATH}/lila_1.1.5_all.deb /vagrant/docker/
                     '''
                 }
             }
@@ -222,6 +222,7 @@ pipeline {
 		    echo "Building Docker image..."
 		    echo "App version set to: ${VERSION}"
                     sh '''
+		    	cd /vagrant/docker
                         docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
@@ -240,6 +241,7 @@ pipeline {
 		    sh '''
 	            	echo "Changes detected in indexes.js. Building Docker image."
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
+       			cd /vagrant/docker
 		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
 		    	docker push ${MONGO_IMAGE_NAME}:latest
