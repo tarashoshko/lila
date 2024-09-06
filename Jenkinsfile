@@ -39,15 +39,18 @@ pipeline {
 	            sh 'git fetch --tags'
 	
 	            def gitTag = sh(script: 'git describe --tags --abbrev=0 || git tag --sort=-v:refname | head -n 1', returnStdout: true).trim()
-	            echo "Latest tag: ${gitTag}"
-	
+	            echo "Latest tag: ${gitTag}"	            
+			
 	            if (gitTag) {
 	                def tagExists = sh(script: """
 	                    curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
 	                    https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${gitTag} \
 	                    | grep -q 'not found'
 	                """, returnStatus: true) == 0
-	
+			if (gitTag.startsWith("v")) {
+	                	gitTag = gitTag.replaceFirst("v", "")
+				echo "Version without 'v': ${gitTag}"
+	            	}
 	                if (!tagExists) {
 	                    echo "Tag '${gitTag}' already exists in releases."
 	                    VERSION = gitTag
