@@ -54,6 +54,7 @@ pipeline {
 	                if (!tagExists) {
 	                    echo "Tag '${gitTag}' already exists in releases."
 	                    VERSION = gitTag
+			    env.VERSION = gitTag
 	                    env.SKIP_UPLOAD = 'false'
 			    echo "App version set to: ${VERSION}"
 	                } else {
@@ -189,21 +190,24 @@ pipeline {
 	                 -H "Content-Type: application/octet-stream" \
 	                 --data-binary @/home/vagrant/lila/target/${ARTIFACT_FILE} \
 	                 "${uploadUrl}"
-	            """
+		    """
 	        }
 	    }
 	}
 
 
         stage('Prepare Artifact') {
+	    when {
+	        environment name: 'SKIP_UPLOAD', value: 'false'
+	    }
             agent { label 'agent1' }
             steps {
                 script {
-                    sh '''
+                    sh """
                         echo "Copying artifact to /vagrant/docker..."
-			echo "App version set to: ${ARTIFACT_FILE}"
+   			cd /home/vagrant/lila/target
                         cp ${ARTIFACT_PATH}/${ARTIFACT_FILE} /vagrant/docker/
-                    '''
+                    """
                 }
             }
         }
@@ -215,7 +219,7 @@ pipeline {
 		    echo "Building Docker image..."
 		    echo "App version set to: ${VERSION}"
                     sh '''
-                        cd /vagrant/docker
+		    	cd /vagrant/docker
                         docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
@@ -233,8 +237,8 @@ pipeline {
                 script {
 		    sh '''
 	            	echo "Changes detected in indexes.js. Building Docker image."
-		    	cd /vagrant/docker			    
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
+       			cd /vagrant/docker
 		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
 		    	docker push ${MONGO_IMAGE_NAME}:latest

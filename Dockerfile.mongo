@@ -1,0 +1,5 @@
+FROM mongo:latest
+
+COPY init-mongo/indexes.js /docker-entrypoint-initdb.d/indexes.js
+
+CMD ["mongod", "--bind_ip_all"]
