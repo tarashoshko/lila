@@ -1,40 +1,19 @@
-FROM ubuntu:20.04
+FROM openjdk:21-jdk
 
-RUN truncate -s0 /tmp/preseed.cfg && \
-    (echo "tzdata tzdata/Areas select Europe" >> /tmp/preseed.cfg) && \
-    (echo "tzdata tzdata/Zones/Europe select Kyiv" >> /tmp/preseed.cfg) && \
-    debconf-set-selections /tmp/preseed.cfg && \
-    rm -f /etc/timezone /etc/localtime && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-    apt-get install -y tzdata
-    
-RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get update && apt-get install -y tzdata && \
+    rm -rf /var/lib/apt/lists/* && \
+    echo "Europe/Kyiv" > /etc/timezone && \
+    ln -sf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime
 
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    software-properties-common \
-    build-essential \
-    tcl \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jdk \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -y \
-    redis-server && \
+RUN apt-get update && apt-get install -y wget && \
+    wget -qO - https://dl.bintray.com/sbt/debian/sbt-debian.gpg | apt-key add - && \
+    echo "deb https://dl.bintray.com/sbt/debian /" | tee /etc/apt/sources.list.d/sbt.list && \
+    apt-get update && apt-get install -y sbt && \
     rm -rf /var/lib/apt/lists/*
 
-ARG LILA_VERSION
+COPY . /home/vagrant/lila
 
-COPY lila_${LILA_VERSION}_all.deb /tmp/lila_${LILA_VERSION}_all.deb
+WORKDIR /home/vagrant/lila
+RUN sbt update
 
-RUN dpkg -i /tmp/lila_${LILA_VERSION}_all.deb \
-    && apt-get install -f -y \
-    && rm /tmp/lila_${LILA_VERSION}_all.deb
-
-WORKDIR /usr/share/lila
-
-CMD ["bin/lila"]
+CMD ["sbt", "run"]
