@@ -16,5 +16,4 @@ COPY . /home/vagrant/lila
 WORKDIR /home/vagrant/lila
 RUN sbt update
 
-#comment
 CMD ["sbt", "run"]
