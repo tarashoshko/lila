@@ -218,8 +218,8 @@ pipeline {
 		    echo "Building Docker image..."
 		    echo "App version set to: ${VERSION}"
                     sh """
-		    	cd /vagrant/docker
-                        docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
+		    	cd /home/vagrant/lila
+                        docker build -f $DOCKERFILE_APP_PATH -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
                     """
@@ -238,7 +238,7 @@ pipeline {
 	            	echo "Changes detected in indexes.js. Building Docker image."
 		    	cp ${DB_SETUP_FILE_PATH} /vagrant/docker/init-mongo
        			cd /vagrant/docker
-		    	docker build -f Dockerfile.mongo -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
+		    	docker build -f $DOCKERFILE_MONGO_PATH -t $MONGO_IMAGE_NAME:${VERSION} -t $MONGO_IMAGE_NAME:latest .
 		    	docker push ${MONGO_IMAGE_NAME}:${VERSION}
 		    	docker push ${MONGO_IMAGE_NAME}:latest
 		    """
