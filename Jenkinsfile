@@ -218,7 +218,7 @@ pipeline {
 		    echo "Building Docker image..."
 		    echo "App version set to: ${VERSION}"
                     sh """
-		    	cd /vagrant/docker
+		    	cd /home/vagrant/lila
                         docker build -f $DOCKERFILE_APP_PATH --build-arg LILA_VERSION=${VERSION} -t $APP_IMAGE_NAME:${VERSION} -t $APP_IMAGE_NAME:latest .
                         docker push ${APP_IMAGE_NAME}:${VERSION}
                         docker push ${APP_IMAGE_NAME}:latest
