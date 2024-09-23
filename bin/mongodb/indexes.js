@@ -1,5 +1,3 @@
-db = db.getSiblingDB('lila');
-db.createCollection('init');
 db.clas_clas.createIndex({ teachers: 1, viewedAt: -1 });
 db.event.createIndex({ startsAt: 1 });
 db.picfit_image.createIndex({ rel: 1 }, { unique: true });
