@@ -42,7 +42,8 @@ lazy val root = Project("lila", file("."))
   .settings(
     name := "lila",
     buildSettings,
-    scalacOptions ++= Seq("-unchecked", "-deprecation"),
+    scalacOptions ++= Seq("-unchecked", "-deprecation", "-release", "21"),
+   
     Debian / name := "lila",
     Debian / maintainer := "tarikhoshko@gmail.com",
     Debian / version := sys.props.getOrElse("VERSION", "1.0.0"),  
