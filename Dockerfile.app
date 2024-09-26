@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
 
 ARG LILA_VERSION
 
-COPY lila_${LILA_VERSION}_all.deb /tmp/lila_${LILA_VERSION}_all.deb
+COPY target/lila_${LILA_VERSION}_all.deb /tmp/lila_${LILA_VERSION}_all.deb
 
 RUN dpkg -i /tmp/lila_${LILA_VERSION}_all.deb \
     && apt-get install -f -y \
