@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-RUN apt-get update && apt-get install -y openjdk-21-jdk tzdata && \
+RUN apt-get update && apt-get install -y openjdk-21-jdk tzdata gnupg && \
     rm -rf /var/lib/apt/lists/* && \
     echo "Europe/Kyiv" > /etc/timezone && \
     ln -sf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime
