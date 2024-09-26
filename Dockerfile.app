@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y \
     redis-server && \
     rm -rf /var/lib/apt/lists/*
 
-ARG LILA_VERSION=1.0.7
+ARG LILA_VERSION
 
 COPY lila_${LILA_VERSION}_all.deb /tmp/lila_${LILA_VERSION}_all.deb
 
