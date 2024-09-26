@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y openjdk-21-jdk tzdata gnupg && \
     ln -sf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime
 
 RUN apt-get update && apt-get install -y wget && \
-    wget -qO - https://dl.bintray.com/sbt/debian/sbt-debian.gpg | apt-key add - && \
     echo "deb https://dl.bintray.com/sbt/debian /" | tee /etc/apt/sources.list.d/sbt.list && \
+    wget -qO - https://keybase.io/sbt/keys/sbt-key.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/sbt.gpg > /dev/null && \
     apt-get update && apt-get install -y sbt && \
     rm -rf /var/lib/apt/lists/*
 
