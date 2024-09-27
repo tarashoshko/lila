@@ -57,3 +57,7 @@ RUNNING_PID
 # Docker-compose / docker sbt
 /docker-compose.yml
 /?
+
+# Terraform secrets 
+terraform-project/terraform.tfvars
+
