@@ -106,7 +106,7 @@ Universal / sourceDirectory                := baseDirectory.value / "dist"
 ThisBuild / libraryDependencySchemes ++= Seq(
   "org.typelevel" %% "cats-parse" % VersionScheme.Always
 )
-
+libraryDependencies += "org.mongodb" % "mongodb-driver-sync" % "4.9.0"
 // format: off
 libraryDependencies ++= akka.bundle ++ playWs.bundle ++ macwire.bundle ++ scalalib.bundle ++ chess.bundle ++ Seq(
   play.json, play.logback, compression, hasher,
