@@ -1,0 +1,52 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo Installing Java-21
+      - apt-get install -y openjdk-21-jdk
+      - update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-21-openjdk-amd64/bin/java 1
+      - update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-21-openjdk-amd64/bin/javac 1
+      - update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
+      - update-alternatives --set javac /usr/lib/jvm/java-21-openjdk-amd64/bin/javac
+      - java -version
+      - apt-get update && apt-get install -y nodejs npm
+      - npm install -g pnpm
+      - curl -fL https://github.com/coursier/launchers/raw/master/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup -y
+      - ./cs install sbt
+      - apt-get update && apt-get install -y docker
+      - echo Logging into DockerHub...
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - echo Installing MongoDB client
+      - apt-get install -y mongodb-clients
+      - echo "Downloading global-bundle.pem from S3..."
+      - aws s3 cp s3://bundleholder/global-bundle.pem global-bundle.pem
+      - echo Setting up environment variables...
+      - export DB_HOST=$DB_HOST
+      - export DB_USER=$DB_USER
+      - export DB_PASSWORD=$DB_PASSWORD
+      - export SSL_CA_FILE=./global-bundle.pem
+      - export VERSION=$VERSION
+  build:
+    commands:   
+      - echo Initializing the database...
+      - mongo --ssl --host $DB_HOST --sslCAFile $SSL_CA_FILE --username $DB_USER --password $DB_PASSWORD < bin/mongodb/indexes.js
+      - echo "Listing all files in the current directory:"
+      - ls -la  # Вивід всіх файлів у поточній директорії
+      - echo Building the UI...
+#      - ui/build
+      - echo Building the project...
+      - sbt -J-Xmx4G -J-Xms2G clean compile
+      - echo Creating deb package...
+      - sbt -DVERSION=$VERSION compile debian:packageBin
+      - echo "Listing files in the 'target' directory:"
+      - ls -la target  # Вивід всіх файлів у директорії target
+      - echo Copying deb package...
+      - cp target/lila_${VERSION}_all.deb . 
+      - echo Building Docker image...
+      - docker build -t $DOCKER_USERNAME/lila:latest -t $DOCKER_USERNAME/lila:$VERSION --build-arg LILA_VERSION=$VERSION -f Dockerfile.app .
+      - echo Pushing Docker image to Docker Hub...
+      - docker push $DOCKER_USERNAME/lila:latest
+      - docker push $DOCKER_USERNAME/lila:$VERSION
