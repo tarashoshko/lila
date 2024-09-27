@@ -12,9 +12,12 @@ final class AsyncDb(
     driver: AsyncDriver
 )(using Executor):
 
-  private lazy val connection: Fu[(MongoConnection, Option[String])] =
+private lazy val connection: Fu[(MongoConnection, Option[String])] =
     MongoConnection.fromString(uri).flatMap { parsedUri =>
-      driver.connect(parsedUri, name.some).dmap(_ -> parsedUri.db)
+      val connectionSettings = MongoConnectionOptions.default.copy(
+        sslEnabled = true
+      )
+      driver.connect(parsedUri, name.some, connectionSettings).dmap(_ -> parsedUri.db)
     }
 
   private def makeDb: Future[DB] =
@@ -41,8 +44,11 @@ final class Db(
     MongoConnection
       .fromString(uri)
       .flatMap: parsedUri =>
+        val connectionSettings = MongoConnectionOptions.default.copy(
+          sslEnabled = true
+        )
         driver
-          .connect(parsedUri, name.some)
+          .connect(parsedUri, name.some, connectionSettings)
           .flatMap(_.database(parsedUri.db.getOrElse("lichess")))
       .await(5.seconds, s"db:$name")
   ) { lap =>
