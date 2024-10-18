@@ -7,15 +7,15 @@ provider "aws" {
 module "vpc" {
   source = "./vpc"
 
-  vpc_cidr                  = var.vpc_cidr
-  public_subnet_cidr_1         = var.public_subnet_cidr_1
-  public_subnet_cidr_2         = var.public_subnet_cidr_2
-  private_subnet_cidr_1        = var.private_subnet_cidr_1
-  private_subnet_cidr_2        = var.private_subnet_cidr_2
-  public_availability_zone_1   = var.public_availability_zone_1
-  public_availability_zone_2   = var.public_availability_zone_2
-  private_availability_zone_1  = var.private_availability_zone_1
-  private_availability_zone_2  = var.private_availability_zone_2
+  vpc_cidr                  = "10.0.0.0/16"
+  public_subnet_cidr_1         = "10.0.1.0/24"
+  public_subnet_cidr_2         = "10.0.2.0/24"
+  private_subnet_cidr_1        = "10.0.3.0/24"
+  private_subnet_cidr_2        = "10.0.4.0/24"
+  public_availability_zone_1   = "eu-central-1a"
+  public_availability_zone_2   = "eu-central-1b"
+  private_availability_zone_1  = "eu-central-1a"
+  private_availability_zone_2  = "eu-central-1b"
 }
 
 resource "aws_docdb_subnet_group" "docdb_subnet_group" { 
@@ -32,8 +32,8 @@ module "docdb" {
 
   db_username            = var.db_username
   db_password            = var.db_password
-  db_name                = var.db_name
-  db_subnet_group_name   = var.db_subnet_group_name
+  db_name                = "lichess"
+  db_subnet_group_name   = "docdb-subnet-group"
   vpc_id                 = module.vpc.vpc_id
 
   docdb_subnet_ids       = module.vpc.private_subnet_ids
